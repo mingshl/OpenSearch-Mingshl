@@ -4,6 +4,7 @@
 ### Dependencies
 - Bumps `azure-core-http-netty` from 1.12.7 to 1.12.8
 - Bumps `reactor-netty` from 1.1.1 to 1.1.2
+- Bumps `wiremock-jre8-standalone` from 2.33.2 to 2.35.0
 
 
 All notable changes to this project are documented in this file.

@@ -1,0 +1,36 @@
+setup:
+  - do:
+      indices.create:
+        index: test
+        body:
+          mappings:
+            properties:
+              ISBN13: keyword,
+              catalog: flat-object
+
+---
+teardown:
+  - do:
+      indices.delete:
+        index: test
+
+---
+"Flat object test":
+  - do:
+      index:
+        index: test
+        id:    1
+        body:  {
+          "ISBN13": "V9781933988177",
+          "catalog": {
+            {
+              "title": "Lucene in Action",
+              "author1":
+              {
+                "surname": "McCandless",
+                "given": "Mike"
+              }
+            }
+          }
+        }
+

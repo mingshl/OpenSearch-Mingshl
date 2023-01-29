@@ -55,6 +55,12 @@ public class FeatureFlags {
     public static final String EXTENSIONS = "opensearch.experimental.feature.extensions.enabled";
 
     /**
+     * Flat Object functionality as specified in the
+     * <a href="https://github.com/opensearch-project/OpenSearch/issues/1018">proposal</a> on GitHub.
+     */
+    public static final String FLAT_OBJECT = "opensearch.experimental.feature.flat_object_enabled";
+
+    /**
      * Should store the settings from opensearch.yml.
      */
     private static Settings settings;
@@ -89,4 +95,6 @@ public class FeatureFlags {
     public static final Setting<Boolean> SEARCHABLE_SNAPSHOT_SETTING = Setting.boolSetting(SEARCHABLE_SNAPSHOT, false, Property.NodeScope);
 
     public static final Setting<Boolean> EXTENSIONS_SETTING = Setting.boolSetting(EXTENSIONS, false, Property.NodeScope);
+
+    public static final Setting<Boolean> FLAT_OBJECT_SETTING = Setting.boolSetting(FLAT_OBJECT, false, Property.NodeScope);
 }

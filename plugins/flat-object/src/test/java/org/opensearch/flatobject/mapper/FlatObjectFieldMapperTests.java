@@ -50,17 +50,17 @@ public class FlatObjectFieldMapperTests extends FieldMapperTestCase2<FlatObjectF
     }
 
     @Override
-    public void testMergeConflicts(){
+    public void testMergeConflicts() {
         // TODO, Merge is not implemented for flat-object yet
     }
 
     @Override
-    public void testMeta(){
+    public void testMeta() {
         // TODO, parse_values is not implemented for flat-object yet
     }
 
     @Override
-    public void testDeprecatedBoost(){
+    public void testDeprecatedBoost() {
         // TODO, [boost : 2.0] is not determined for flat-object yet,
         // might need to overwrite this test
     }

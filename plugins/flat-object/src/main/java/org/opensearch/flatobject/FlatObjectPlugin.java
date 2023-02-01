@@ -18,10 +18,11 @@ import org.opensearch.plugins.MapperPlugin;
 import org.opensearch.plugins.Plugin;
 import org.opensearch.plugins.SearchPlugin;
 
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+
+import static java.util.Collections.singletonList;
+import static java.util.Collections.singletonMap;
 
 /**
  * Flat Object plugin.
@@ -36,12 +37,13 @@ public class FlatObjectPlugin extends Plugin implements SearchPlugin, MapperPlug
 
     @Override
     public List<QuerySpec<?>> getQueries() {
-        return
-            Arrays.asList( new QuerySpec<>(FlatObjectQueryBuilder.NAME, FlatObjectQueryBuilder::new, FlatObjectQueryBuilder::fromXContent));
+        return singletonList(
+            new QuerySpec<>(FlatObjectQueryBuilder.NAME, FlatObjectQueryBuilder::new, FlatObjectQueryBuilder::fromXContent)
+        );
     }
 
     @Override
     public Map<String, Mapper.TypeParser> getMappers() {
-        return Collections.singletonMap(FlatObjectFieldMapper.CONTENT_TYPE, new FlatObjectFieldMapper.TypeParser());
+        return singletonMap(FlatObjectFieldMapper.CONTENT_TYPE, new FlatObjectFieldMapper.TypeParser());
     }
 }

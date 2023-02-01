@@ -7,7 +7,9 @@
  */
 
 package org.opensearch.flatobject.query;
+
 import org.apache.lucene.search.Query;
+import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.common.xcontent.XContentParser;
@@ -17,10 +19,15 @@ import org.opensearch.index.query.QueryShardContext;
 
 import java.io.IOException;
 
-
 public class FlatObjectQueryBuilder extends AbstractQueryBuilder<FlatObjectQueryBuilder> {
 
     public static final String NAME = "flat-object";
+
+    public FlatObjectQueryBuilder() {}
+
+    public FlatObjectQueryBuilder(StreamInput in) throws IOException {
+        super(in);
+    }
 
     /**
      * Constructs a query, considering two cases
@@ -34,34 +41,32 @@ public class FlatObjectQueryBuilder extends AbstractQueryBuilder<FlatObjectQuery
     }
 
     @Override
-    protected void doWriteTo(StreamOutput out) throws IOException {
-    }
+    protected void doWriteTo(StreamOutput out) throws IOException {}
 
     @Override
     protected void doXContent(XContentBuilder builder, Params params) throws IOException {
-        //TODO
+        // TODO
     }
 
     @Override
     protected Query doToQuery(QueryShardContext context) throws IOException {
-        //TODO
+        // TODO
         return null;
     }
 
     @Override
     protected boolean doEquals(FlatObjectQueryBuilder other) {
-        //TODO
+        // TODO
         return false;
     }
 
     @Override
     protected int doHashCode() {
-        //TODO
+        // TODO
         return 0;
     }
 
-
-    public static QueryBuilder fromXContent(XContentParser xContentParser)  throws IOException {
+    public static QueryBuilder fromXContent(XContentParser xContentParser) throws IOException {
         float boost = AbstractQueryBuilder.DEFAULT_BOOST;
         String type = null;
         String id = null;
@@ -69,7 +74,7 @@ public class FlatObjectQueryBuilder extends AbstractQueryBuilder<FlatObjectQuery
         String currentFieldName = null;
         XContentParser.Token token;
 
-        //TODO depends on parser methods
+        // TODO depends on parser methods
 
         FlatObjectQueryBuilder queryBuilder = new FlatObjectQueryBuilder();
         queryBuilder.queryName(queryName);

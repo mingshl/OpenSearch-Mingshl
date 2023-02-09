@@ -6,79 +6,84 @@
  * compatible open source license.
  */
 
-package org.opensearch.flatobject.query;
+package org.opensearch.flatobject.mapper;
 
-import org.apache.lucene.search.Query;
-import org.opensearch.common.io.stream.StreamInput;
-import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.xcontent.XContentBuilder;
-import org.opensearch.common.xcontent.XContentParser;
-import org.opensearch.index.query.AbstractQueryBuilder;
-import org.opensearch.index.query.QueryBuilder;
-import org.opensearch.index.query.QueryShardContext;
+import org.opensearch.flatobject.FlatObjectPlugin;
+import org.opensearch.index.mapper.MapperTestCase;
+import org.opensearch.plugins.Plugin;
 
 import java.io.IOException;
+import java.util.Collection;
 
-public class FlatObjectQueryBuilder extends AbstractQueryBuilder<FlatObjectQueryBuilder> {
+public class FlatObjectFieldMapperTests extends MapperTestCase {
+    private static final String FIELD_TYPE = "flat-object";
 
-    public static final String NAME = "flat-object";
+    // @Override
+    public FlatObjectFieldMapper.Builder newBuilder() {
+        return new FlatObjectFieldMapper.Builder("flat-object");
+    }
 
-    public FlatObjectQueryBuilder() {}
+    @Override
+    protected Collection<? extends Plugin> getPlugins() {
+        return org.opensearch.common.collect.List.of(new FlatObjectPlugin());
+    }
 
-    public FlatObjectQueryBuilder(StreamInput in) throws IOException {
-        super(in);
+    @Override
+    public void minimalMapping(XContentBuilder b) throws IOException {
+        b.field("type", FIELD_TYPE);
     }
 
     /**
-     * Constructs a query, considering two cases
-     * if without specifying the path of the value, query in value only stringField,
-     * else (with dot path), query in content_and_path stringField
+     * Writes a sample value for the field to the provided {@link XContentBuilder}.
+     *
+     * @param builder builder
      */
-
     @Override
-    public String getWriteableName() {
-        return null;
+    protected void writeFieldValue(XContentBuilder builder) throws IOException {
+        builder.value("value");
     }
 
     @Override
-    protected void doWriteTo(StreamOutput out) throws IOException {}
+    protected void registerParameters(ParameterChecker checker) throws IOException {
+        checker.registerConflictCheck("doc_values", b -> b.field("doc_values", false));
+        checker.registerConflictCheck("index", b -> b.field("index", false));
+        checker.registerConflictCheck("store", b -> b.field("store", true));
+        checker.registerConflictCheck("index_options", b -> b.field("index_options", "freqs"));
+        checker.registerConflictCheck("null_value", b -> b.field("null_value", "foo"));
+        checker.registerConflictCheck("similarity", b -> b.field("similarity", "boolean"));
+        checker.registerConflictCheck("normalizer", b -> b.field("normalizer", "lowercase"));
 
-    @Override
-    protected void doXContent(XContentBuilder builder, Params params) throws IOException {
-        // TODO
+        checker.registerUpdateCheck(b -> b.field("eager_global_ordinals", true), m -> assertTrue(m.fieldType().eagerGlobalOrdinals()));
+        checker.registerUpdateCheck(b -> b.field("ignore_above", 256), m -> assertEquals(256, ((FlatObjectFieldMapper) m).ignoreAbove()));
+        checker.registerUpdateCheck(
+            b -> b.field("split_queries_on_whitespace", true),
+            m -> assertEquals("_whitespace", m.fieldType().getTextSearchInfo().getSearchAnalyzer().name())
+        );
+
+        // norms can be set from true to false, but not vice versa
+        checker.registerConflictCheck("norms", b -> b.field("norms", true));
+        checker.registerUpdateCheck(b -> {
+            b.field("type", "flat-object");
+            b.field("norms", true);
+        }, b -> {
+            b.field("type", "flat-object");
+            b.field("norms", false);
+        }, m -> assertFalse(m.fieldType().getTextSearchInfo().hasNorms()));
+
+        checker.registerUpdateCheck(b -> b.field("boost", 2.0), m -> assertEquals(m.fieldType().boost(), 2.0, 0));
     }
 
     @Override
-    protected Query doToQuery(QueryShardContext context) throws IOException {
-        // TODO
-        return null;
+    public void testMinimalToMaximal() throws IOException {
+        // ToDO [299 OpenSearch-3.0.0-SNAPSHOT-unknown "Parameter [boost] on field [field] is deprecated and will be removed in 8.0"]
+
     }
 
     @Override
-    protected boolean doEquals(FlatObjectQueryBuilder other) {
-        // TODO
-        return false;
+    public void testUpdates() throws IOException {
+        // Todo
+
     }
 
-    @Override
-    protected int doHashCode() {
-        // TODO
-        return 0;
-    }
-
-    public static QueryBuilder fromXContent(XContentParser xContentParser) throws IOException {
-        float boost = AbstractQueryBuilder.DEFAULT_BOOST;
-        String type = null;
-        String id = null;
-        String queryName = null;
-        String currentFieldName = null;
-        XContentParser.Token token;
-
-        // TODO depends on parser methods
-
-        FlatObjectQueryBuilder queryBuilder = new FlatObjectQueryBuilder();
-        queryBuilder.queryName(queryName);
-        queryBuilder.boost(boost);
-        return queryBuilder;
-    }
 }

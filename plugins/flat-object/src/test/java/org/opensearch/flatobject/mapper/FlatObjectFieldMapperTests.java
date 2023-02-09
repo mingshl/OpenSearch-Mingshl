@@ -6,63 +6,79 @@
  * compatible open source license.
  */
 
-package org.opensearch.flatobject.mapper;
+package org.opensearch.flatobject.query;
 
+import org.apache.lucene.search.Query;
+import org.opensearch.common.io.stream.StreamInput;
+import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.xcontent.XContentBuilder;
-import org.opensearch.flatobject.FlatObjectPlugin;
-import org.opensearch.index.mapper.FieldMapperTestCase2;
-import org.opensearch.plugins.Plugin;
+import org.opensearch.common.xcontent.XContentParser;
+import org.opensearch.index.query.AbstractQueryBuilder;
+import org.opensearch.index.query.QueryBuilder;
+import org.opensearch.index.query.QueryShardContext;
 
 import java.io.IOException;
-import java.util.Collection;
 
-public class FlatObjectFieldMapperTests extends FieldMapperTestCase2<FlatObjectFieldMapper.Builder> {
-    private static final String FIELD_TYPE = "flat-object";
+public class FlatObjectQueryBuilder extends AbstractQueryBuilder<FlatObjectQueryBuilder> {
 
-    @Override
-    public FlatObjectFieldMapper.Builder newBuilder() {
-        return new FlatObjectFieldMapper.Builder("flat-object");
-    }
+    public static final String NAME = "flat-object";
 
-    @Override
-    protected Collection<? extends Plugin> getPlugins() {
-        return org.opensearch.common.collect.List.of(new FlatObjectPlugin());
-    }
+    public FlatObjectQueryBuilder() {}
 
-    @Override
-    public void minimalMapping(XContentBuilder b) throws IOException {
-        b.field("type", FIELD_TYPE);
+    public FlatObjectQueryBuilder(StreamInput in) throws IOException {
+        super(in);
     }
 
     /**
-     * Writes a sample value for the field to the provided {@link XContentBuilder}.
-     *
-     * @param builder builder
+     * Constructs a query, considering two cases
+     * if without specifying the path of the value, query in value only stringField,
+     * else (with dot path), query in content_and_path stringField
      */
+
     @Override
-    protected void writeFieldValue(XContentBuilder builder) throws IOException {
-        builder.value("value");
+    public String getWriteableName() {
+        return null;
     }
 
     @Override
-    protected void registerParameters(ParameterChecker checker) throws IOException {
+    protected void doWriteTo(StreamOutput out) throws IOException {}
+
+    @Override
+    protected void doXContent(XContentBuilder builder, Params params) throws IOException {
         // TODO
     }
 
     @Override
-    public void testMergeConflicts() {
-        // TODO, Merge is not implemented for flat-object yet
+    protected Query doToQuery(QueryShardContext context) throws IOException {
+        // TODO
+        return null;
     }
 
     @Override
-    public void testMeta() {
-        // TODO, parse_values is not implemented for flat-object yet
+    protected boolean doEquals(FlatObjectQueryBuilder other) {
+        // TODO
+        return false;
     }
 
     @Override
-    public void testDeprecatedBoost() {
-        // TODO, [boost : 2.0] is not determined for flat-object yet,
-        // might need to overwrite this test
+    protected int doHashCode() {
+        // TODO
+        return 0;
     }
 
+    public static QueryBuilder fromXContent(XContentParser xContentParser) throws IOException {
+        float boost = AbstractQueryBuilder.DEFAULT_BOOST;
+        String type = null;
+        String id = null;
+        String queryName = null;
+        String currentFieldName = null;
+        XContentParser.Token token;
+
+        // TODO depends on parser methods
+
+        FlatObjectQueryBuilder queryBuilder = new FlatObjectQueryBuilder();
+        queryBuilder.queryName(queryName);
+        queryBuilder.boost(boost);
+        return queryBuilder;
+    }
 }

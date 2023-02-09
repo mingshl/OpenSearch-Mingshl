@@ -44,6 +44,9 @@ public class FlatObjectPlugin extends Plugin implements SearchPlugin, MapperPlug
 
     @Override
     public Map<String, Mapper.TypeParser> getMappers() {
-        return singletonMap(FlatObjectFieldMapper.CONTENT_TYPE, new FlatObjectFieldMapper.TypeParser());
+        return singletonMap(
+            FlatObjectFieldMapper.CONTENT_TYPE,
+            new FlatObjectFieldMapper.TypeParser((n, c) -> new FlatObjectFieldMapper.Builder(n, c.getIndexAnalyzers()))
+        );
     }
 }

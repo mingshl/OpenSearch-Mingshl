@@ -9,6 +9,8 @@
  * GitHub history for details.
  */
 
+import org.opensearch.gradle.test.RestIntegTestTask
+
 //apply plugin: 'opensearch.opensearchplugin'
 apply plugin: 'opensearch.yaml-rest-test'
 apply plugin: 'opensearch.internal-cluster-test'
@@ -27,4 +29,34 @@ restResources {
   restApi {
     includeCore '_common', 'indices', 'index', 'search'
   }
+}
+
+task integTest(type: RestIntegTestTask) {
+  description = "Run tests against a cluster"
+  testClassesDirs = sourceSets.test.output.classesDirs
+  classpath = sourceSets.test.runtimeClasspath
+}
+tasks.named("check").configure { dependsOn(integTest) }
+
+integTest {
+  // The --debug-jvm command-line option makes the cluster debuggable; this makes the tests debuggable
+  if (System.getProperty("test.debug") != null) {
+    jvmArgs '-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005'
+  }
+}
+
+testClusters.integTest {
+  testDistribution = "INTEG_TEST"
+
+  // This installs our plugin into the testClusters
+  plugin(project.tasks.bundlePlugin.archiveFile)
+}
+
+// Uncommend the following if you want to spin up testcluster with more than one node.
+//testClusters.all {
+//  numberOfNodes = 2
+//}
+
+run {
+  useCluster testClusters.integTest
 }

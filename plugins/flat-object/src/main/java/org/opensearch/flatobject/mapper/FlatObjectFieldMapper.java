@@ -19,7 +19,10 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.util.BytesRef;
 import org.opensearch.common.Nullable;
 import org.opensearch.common.lucene.Lucene;
+import org.opensearch.common.xcontent.DeprecationHandler;
+import org.opensearch.common.xcontent.NamedXContentRegistry;
 import org.opensearch.common.xcontent.XContentParser;
+import org.opensearch.flatobject.xcontent.KeyValueJsonXContentParser;
 import org.opensearch.index.analysis.IndexAnalyzers;
 import org.opensearch.index.analysis.NamedAnalyzer;
 import org.opensearch.index.fielddata.IndexFieldData;
@@ -320,18 +323,19 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
             return new SourceValueFetcher(name(), context, nullValue) {
                 @Override
                 protected String parseSourceValue(Object value) {
-                    String flatObjectkeywordValue = value.toString();
-                    if (flatObjectkeywordValue.length() > ignoreAbove) {
+                    String flatObjectKeywordValue = value.toString();
+
+                    if (flatObjectKeywordValue.length() > ignoreAbove) {
                         return null;
                     }
 
                     NamedAnalyzer normalizer = normalizer();
                     if (normalizer == null) {
-                        return flatObjectkeywordValue;
+                        return flatObjectKeywordValue;
                     }
 
                     try {
-                        return normalizeValue(normalizer, name(), flatObjectkeywordValue);
+                        return normalizeValue(normalizer, name(), flatObjectKeywordValue);
                     } catch (IOException e) {
                         throw new UncheckedIOException(e);
                     }
@@ -437,22 +441,41 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
 
     @Override
     protected void parseCreateField(ParseContext context) throws IOException {
-        String value;
-        // default not having external value set
+        String value = null;
+        String fieldName;
+
         if (context.externalValueSet()) {
             value = context.externalValue().toString();
+            ParseValueAddFields(context, value);
         } else {
-            logger.info("\n check the context.doc without parser:" + context.doc() + "\n");
-            /**
-             * To be determined to write a new parser to read
-             * context and tokenized into key-value pairs
-             * option 1：catalog.title=Lucene in Action
-             * option 2: catalog.title=Lucene, catalog.title=in, catalog.title=Action
-             */
-            XContentParser parser = context.parser();
-            value = parser.textOrNull();
+            KeyValueJsonXContentParser KeyValueJsonParser = new KeyValueJsonXContentParser(
+                NamedXContentRegistry.EMPTY,
+                DeprecationHandler.IGNORE_DEPRECATIONS,
+                context
+            );
+            XContentParser parser = KeyValueJsonParser.parseObject();
+
+            XContentParser.Token currentToken;
+            while ((currentToken = parser.nextToken()) != XContentParser.Token.END_OBJECT) {
+                switch (currentToken) {
+                    case FIELD_NAME:
+                        fieldName = parser.currentName();
+                        logger.info("fieldName: " + fieldName);
+                        break;
+                    case VALUE_STRING:
+                        value = parser.textOrNull();
+                        logger.info("value: " + value);
+                        ParseValueAddFields(context, value);
+                        break;
+                }
+
+            }
+
         }
 
+    }
+
+    private void ParseValueAddFields(ParseContext context, String value) throws IOException {
         if (value == null || value.length() > ignoreAbove) {
             return;
         }
@@ -479,7 +502,6 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
     }
 
     private static String normalizeValue(NamedAnalyzer normalizer, String field, String value) throws IOException {
-        logger.info("\n check the field before normalizer:" + field + "\n");
 
         try (TokenStream ts = normalizer.tokenStream(field, value)) {
             final CharTermAttribute termAtt = ts.addAttribute(CharTermAttribute.class);
@@ -506,7 +528,6 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
                 );
             }
             ts.end();
-            logger.info("\n check the new Value after normalizer" + newValue);
             return newValue;
         }
     }

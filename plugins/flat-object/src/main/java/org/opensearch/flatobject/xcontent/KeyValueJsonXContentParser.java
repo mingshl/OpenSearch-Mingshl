@@ -8,6 +8,7 @@
 
 package org.opensearch.flatobject.xcontent;
 
+import com.fasterxml.jackson.core.JsonParser;
 import org.opensearch.common.bytes.BytesReference;
 import org.opensearch.common.xcontent.DeprecationHandler;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
@@ -51,18 +52,8 @@ public class KeyValueJsonXContentParser extends AbstractXContentParser {
     }
 
     public XContentParser parseObject() throws IOException {
-        String currentFieldName = null;
         builder.startObject();
-        while (this.parser.nextToken() != Token.END_OBJECT) {
-            currentFieldName = this.parser.currentName();
-            logger.info("currentFieldName: " + currentFieldName + "\n");
-            this.parser.nextToken();
-            StringBuilder parsedFields = new StringBuilder();
-            parseValue(currentFieldName, parsedFields);
-            builder.field(currentFieldName + "_path", currentFieldName);
-            builder.field(currentFieldName + "_value", parsedFields.toString());
-        }
-
+        parseToken();
         builder.endObject();
         String jString = XContentHelper.convertToJson(BytesReference.bytes(builder), false, XContentType.JSON);
         logger.info("Before createParser, jString: " + jString + "\n");
@@ -70,11 +61,43 @@ public class KeyValueJsonXContentParser extends AbstractXContentParser {
         return JsonXContent.jsonXContent.createParser(this.xContentRegistry, this.deprecationHandler, String.valueOf(jString));
     }
 
+    private void parseToken() throws IOException {
+        String currentFieldName;
+        while (this.parser.nextToken() != Token.END_OBJECT) {
+
+            currentFieldName = this.parser.currentName();
+
+            logger.info("currentFieldName: " + currentFieldName + "\n");
+            StringBuilder parsedFields = new StringBuilder();
+            if (this.parser.nextToken() == Token.START_OBJECT){
+                /**
+                 * for nested Json, make a copy of parser, then parse the entire Json as string.
+                 * for example:
+                 * {"grandpa": {
+                 *     "dad": {
+                 *     "son": "me"
+                 * } }
+                 * the flat field for "grandpa" would be {"grandpa_path": "grandpa", "grandpa_value"= "{"dad: {"son": "me"}"}"}
+                 */
+                //To do. to convert the entire JsonObject without changing the tokenizer position.
+                parsedFields.append(this.parser.toString() );
+//              parsedFields.append(this.parser.mapOrdered().toString() );
+                builder.field(currentFieldName + "_path", currentFieldName);
+                builder.field(currentFieldName + "_value", parsedFields.toString());
+                parseToken();
+            }
+            else{
+                parseValue(currentFieldName, parsedFields);
+                builder.field(currentFieldName + "_path", currentFieldName);
+                builder.field(currentFieldName + "_value", parsedFields.toString());
+            }
+
+        }
+    }
+
     private void parseValue(String currentFieldName, StringBuilder parsedFields) throws IOException {
+        logger.info("this.parser.currentToken(): " + this.parser.currentToken() + "\n");
         switch (this.parser.currentToken()) {
-            case START_OBJECT:
-                parseObject();
-                break;
             case VALUE_STRING:
                 /**
                  * this is "value" only format for each subfield
@@ -84,6 +107,16 @@ public class KeyValueJsonXContentParser extends AbstractXContentParser {
                 logger.info("currentFieldName and parsedFields :" + currentFieldName + " " + parsedFields.toString() + "\n");
                 break;
             // Handle other token types as needed
+            // ToDo, what do we do, if encountered these fields?
+            // should never gets to START_OBJECT
+            case START_OBJECT:
+                throw new IOException("Unsupported token type");
+            case FIELD_NAME:
+                logger.info("token is FIELD_NAME: " + this.parser.currentName() + "\n");
+                break;
+            case  VALUE_EMBEDDED_OBJECT:
+                logger.info("token is VALUE_EMBEDDED_OBJECT: " + this.parser.objectText()+ "\n");
+                break;
             default:
                 throw new IOException("Unsupported token type [" + parser.currentToken() + "]");
         }

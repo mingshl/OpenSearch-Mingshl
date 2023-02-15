@@ -41,7 +41,9 @@ public class FlatObjectFieldMapperTests extends MapperTestCase {
      */
     @Override
     protected void writeFieldValue(XContentBuilder builder) throws IOException {
-        builder.value("value");
+        builder.startObject();
+            builder.field("foo", "bar");
+        builder.endObject();
     }
 
     @Override

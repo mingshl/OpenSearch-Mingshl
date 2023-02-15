@@ -13,6 +13,7 @@ import org.opensearch.flatobject.FlatObjectPlugin;
 import org.opensearch.index.query.QueryShardContext;
 import org.opensearch.plugins.Plugin;
 import org.opensearch.test.AbstractQueryTestCase;
+import org.opensearch.test.TestGeoShapeFieldMapperPlugin;
 import org.opensearch.test.transport.MockTransportService;
 
 import java.io.IOException;
@@ -23,7 +24,7 @@ public class FlatObjectQueryBuilderTests extends AbstractQueryTestCase<FlatObjec
 
     @Override
     protected Collection<Class<? extends Plugin>> getPlugins() {
-        return Arrays.asList(FlatObjectPlugin.class, MockTransportService.TestPlugin.class);
+        return Arrays.asList(FlatObjectPlugin.class, MockTransportService.TestPlugin.class, TestGeoShapeFieldMapperPlugin.class);
     }
 
     @Override

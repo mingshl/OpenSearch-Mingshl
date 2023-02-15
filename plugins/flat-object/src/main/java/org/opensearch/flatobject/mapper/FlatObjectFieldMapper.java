@@ -442,16 +442,17 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
     @Override
     protected void parseCreateField(ParseContext context) throws IOException {
         String value = null;
-        String fieldName;
+        String fieldName = null;
 
         if (context.externalValueSet()) {
             value = context.externalValue().toString();
-            ParseValueAddFields(context, value);
+            ParseValueAddFields(context, value, fieldType().name());
         } else {
             KeyValueJsonXContentParser KeyValueJsonParser = new KeyValueJsonXContentParser(
                 NamedXContentRegistry.EMPTY,
                 DeprecationHandler.IGNORE_DEPRECATIONS,
-                context
+                context,
+                fieldType().name()
             );
             XContentParser parser = KeyValueJsonParser.parseObject();
 
@@ -465,7 +466,7 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
                     case VALUE_STRING:
                         value = parser.textOrNull();
                         logger.info("value: " + value);
-                        ParseValueAddFields(context, value);
+                        ParseValueAddFields(context,value, fieldName);
                         break;
                 }
 
@@ -475,7 +476,7 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
 
     }
 
-    private void ParseValueAddFields(ParseContext context, String value) throws IOException {
+    private void ParseValueAddFields(ParseContext context, String value, String fieldName) throws IOException {
         if (value == null || value.length() > ignoreAbove) {
             return;
         }
@@ -484,21 +485,56 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
         if (normalizer != null) {
             value = normalizeValue(normalizer, name(), value);
         }
+//            logger.info("FlatObjectField name is " +  fieldType().name());
+//            logger.info("FlatObjectField name is " +  fieldName.split("_")[0]);
+//            Field field = new FlatObjectField(fieldName.split("_")[0], binaryValue, fieldType);
 
-        // convert to utf8 only once before feeding postings/dv/stored fields
-        final BytesRef binaryValue = new BytesRef(value);
+        String[] stringPartType = fieldName.split("_");
+
         if (fieldType.indexOptions() != IndexOptions.NONE || fieldType.stored()) {
-            Field field = new FlatObjectField(fieldType().name(), binaryValue, fieldType);
-            context.doc().add(field);
-
+            logger.info("FlatObjectField name is " + fieldName);
+            logger.info("FlatObjectField value is " + value);
+            // convert to utf8 only once before feeding postings/dv/stored fields
+            final BytesRef pathAndValueBinaryValue = new BytesRef( value);
+            Field pathAndValueField = new FlatObjectField(fieldType().name(), pathAndValueBinaryValue, fieldType);
+            context.doc().add(pathAndValueField);
+            if (fieldType().hasDocValues()) {
+                context.doc().add(new SortedSetDocValuesField(fieldType().name(), pathAndValueBinaryValue));
+            }
+//            switch (stringPartType[stringPartType.length-1]) {
+//                case "pathAndValue":
+//                    logger.info("FlatObjectField name is " + fieldName);
+//                    logger.info("FlatObjectField value is " + value);
+//                    // convert to utf8 only once before feeding postings/dv/stored fields
+//                    final BytesRef pathAndValueBinaryValue = new BytesRef( value);
+//                    Field pathAndValueField = new FlatObjectField(fieldType().name()+".pathAndValue", pathAndValueBinaryValue, fieldType);
+//                    context.doc().add(pathAndValueField);
+//                    if (fieldType().hasDocValues()) {
+//                        context.doc().add(new SortedSetDocValuesField(fieldType().name()+".pathAndValue", pathAndValueBinaryValue));
+//                    }
+//                    break;
+//                default:
+//                    logger.info("FlatObjectField name is " + fieldName);
+//                    logger.info("FlatObjectField value is " + value);
+//                    // convert to utf8 only once before feeding postings/dv/stored fields
+//                    final BytesRef binaryValue = new BytesRef(value);
+//                    Field field = new FlatObjectField(fieldType().name(), binaryValue, fieldType);
+//                    context.doc().add(field);
+//
+//                    if (fieldType().hasDocValues()) {
+//                        context.doc().add(new SortedSetDocValuesField(fieldType().name(), binaryValue));
+//                    }
+//                    break;
+//
+//
+//            }
+            //TO do, revisit what omitNorms should work for flat-object
             if (fieldType().hasDocValues() == false && fieldType.omitNorms()) {
                 createFieldNamesField(context);
             }
         }
 
-        if (fieldType().hasDocValues()) {
-            context.doc().add(new SortedSetDocValuesField(fieldType().name(), binaryValue));
-        }
+
     }
 
     private static String normalizeValue(NamedAnalyzer normalizer, String field, String value) throws IOException {

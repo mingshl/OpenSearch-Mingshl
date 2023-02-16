@@ -1,3 +1,6 @@
+# Simple smoke test: flat-object field mapping type can be sent to cluster and simple document can be indexed.
+
+---
 setup:
   - do:
       indices.create:
@@ -23,13 +26,11 @@ teardown:
         body:  {
           "ISBN13": "V9781933988177",
           "catalog": {
+            "title": "Lucene in Action",
+            "author1":
             {
-              "title": "Lucene in Action",
-              "author1":
-              {
-                "surname": "McCandless",
-                "given": "Mike"
-              }
+              "surname": "McCandless",
+              "given": "Mike"
             }
           }
         }

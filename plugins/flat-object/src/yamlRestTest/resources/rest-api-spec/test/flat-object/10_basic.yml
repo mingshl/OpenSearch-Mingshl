@@ -7,9 +7,12 @@ setup:
         index: test
         body:
           mappings:
+            dynamic: strict
             properties:
-              ISBN13: keyword,
-              catalog: flat-object
+              ISBN13:
+                type : "keyword"
+              catalog:
+                type : "flat-object"
 
 ---
 teardown:
@@ -27,7 +30,7 @@ teardown:
           "ISBN13": "V9781933988177",
           "catalog": {
             "title": "Lucene in Action",
-            "author1":
+            "author":
             {
               "surname": "McCandless",
               "given": "Mike"
@@ -35,3 +38,19 @@ teardown:
           }
         }
 
+  # Do index refresh
+  - do:
+      indices.refresh:
+        index: test
+
+  - do:
+      search:
+        body: {
+          _source: true,
+          query: {
+            match: { catalog: "Lucene in Action"}
+          }
+        }
+
+  - length:   { hits.hits: 1  }
+  - match: { hits.hits.0._source.catalog.title: "Lucene in Action" }

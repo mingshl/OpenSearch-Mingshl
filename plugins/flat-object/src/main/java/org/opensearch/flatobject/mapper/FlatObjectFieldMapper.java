@@ -466,7 +466,7 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
                     case VALUE_STRING:
                         value = parser.textOrNull();
                         logger.info("value: " + value);
-                        ParseValueAddFields(context,value, fieldName);
+                        ParseValueAddFields(context, value, fieldName);
                         break;
                 }
 
@@ -485,9 +485,9 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
         if (normalizer != null) {
             value = normalizeValue(normalizer, name(), value);
         }
-//            logger.info("FlatObjectField name is " +  fieldType().name());
-//            logger.info("FlatObjectField name is " +  fieldName.split("_")[0]);
-//            Field field = new FlatObjectField(fieldName.split("_")[0], binaryValue, fieldType);
+        // logger.info("FlatObjectField name is " + fieldType().name());
+        // logger.info("FlatObjectField name is " + fieldName.split("_")[0]);
+        // Field field = new FlatObjectField(fieldName.split("_")[0], binaryValue, fieldType);
 
         String[] stringPartType = fieldName.split("_");
 
@@ -495,45 +495,44 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
             logger.info("FlatObjectField name is " + fieldName);
             logger.info("FlatObjectField value is " + value);
             // convert to utf8 only once before feeding postings/dv/stored fields
-            final BytesRef pathAndValueBinaryValue = new BytesRef( value);
+            final BytesRef pathAndValueBinaryValue = new BytesRef(value);
             Field pathAndValueField = new FlatObjectField(fieldType().name(), pathAndValueBinaryValue, fieldType);
             context.doc().add(pathAndValueField);
             if (fieldType().hasDocValues()) {
                 context.doc().add(new SortedSetDocValuesField(fieldType().name(), pathAndValueBinaryValue));
             }
-//            switch (stringPartType[stringPartType.length-1]) {
-//                case "pathAndValue":
-//                    logger.info("FlatObjectField name is " + fieldName);
-//                    logger.info("FlatObjectField value is " + value);
-//                    // convert to utf8 only once before feeding postings/dv/stored fields
-//                    final BytesRef pathAndValueBinaryValue = new BytesRef( value);
-//                    Field pathAndValueField = new FlatObjectField(fieldType().name()+".pathAndValue", pathAndValueBinaryValue, fieldType);
-//                    context.doc().add(pathAndValueField);
-//                    if (fieldType().hasDocValues()) {
-//                        context.doc().add(new SortedSetDocValuesField(fieldType().name()+".pathAndValue", pathAndValueBinaryValue));
-//                    }
-//                    break;
-//                default:
-//                    logger.info("FlatObjectField name is " + fieldName);
-//                    logger.info("FlatObjectField value is " + value);
-//                    // convert to utf8 only once before feeding postings/dv/stored fields
-//                    final BytesRef binaryValue = new BytesRef(value);
-//                    Field field = new FlatObjectField(fieldType().name(), binaryValue, fieldType);
-//                    context.doc().add(field);
-//
-//                    if (fieldType().hasDocValues()) {
-//                        context.doc().add(new SortedSetDocValuesField(fieldType().name(), binaryValue));
-//                    }
-//                    break;
-//
-//
-//            }
-            //TO do, revisit what omitNorms should work for flat-object
+            // switch (stringPartType[stringPartType.length-1]) {
+            // case "pathAndValue":
+            // logger.info("FlatObjectField name is " + fieldName);
+            // logger.info("FlatObjectField value is " + value);
+            // // convert to utf8 only once before feeding postings/dv/stored fields
+            // final BytesRef pathAndValueBinaryValue = new BytesRef( value);
+            // Field pathAndValueField = new FlatObjectField(fieldType().name()+".pathAndValue", pathAndValueBinaryValue, fieldType);
+            // context.doc().add(pathAndValueField);
+            // if (fieldType().hasDocValues()) {
+            // context.doc().add(new SortedSetDocValuesField(fieldType().name()+".pathAndValue", pathAndValueBinaryValue));
+            // }
+            // break;
+            // default:
+            // logger.info("FlatObjectField name is " + fieldName);
+            // logger.info("FlatObjectField value is " + value);
+            // // convert to utf8 only once before feeding postings/dv/stored fields
+            // final BytesRef binaryValue = new BytesRef(value);
+            // Field field = new FlatObjectField(fieldType().name(), binaryValue, fieldType);
+            // context.doc().add(field);
+            //
+            // if (fieldType().hasDocValues()) {
+            // context.doc().add(new SortedSetDocValuesField(fieldType().name(), binaryValue));
+            // }
+            // break;
+            //
+            //
+            // }
+            // TO do, revisit what omitNorms should work for flat-object
             if (fieldType().hasDocValues() == false && fieldType.omitNorms()) {
                 createFieldNamesField(context);
             }
         }
-
 
     }
 

@@ -8,7 +8,6 @@
 
 package org.opensearch.flatobject.xcontent;
 
-import org.apache.lucene.document.FieldType;
 import org.opensearch.common.bytes.BytesReference;
 import org.opensearch.common.xcontent.DeprecationHandler;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
@@ -45,7 +44,8 @@ public class KeyValueJsonXContentParser extends AbstractXContentParser {
         NamedXContentRegistry xContentRegistry,
         DeprecationHandler deprecationHandler,
         ParseContext parseContext,
-        String fieldTypeName) throws IOException {
+        String fieldTypeName
+    ) throws IOException {
         super(xContentRegistry, deprecationHandler);
         this.parseContext = parseContext;
         this.deprecationHandler = deprecationHandler;
@@ -73,7 +73,7 @@ public class KeyValueJsonXContentParser extends AbstractXContentParser {
             logger.info("currentFieldName: " + currentFieldName + "\n");
             StringBuilder parsedFields = new StringBuilder();
             StringBuilder path = new StringBuilder(fieldTypeName);
-            if (this.parser.nextToken() == Token.START_OBJECT){
+            if (this.parser.nextToken() == Token.START_OBJECT) {
                 /**
                  * for nested Json, make a copy of parser, then parse the entire Json as string.
                  * for example:
@@ -95,17 +95,16 @@ public class KeyValueJsonXContentParser extends AbstractXContentParser {
                  * "son_pathAndValue =  "grandpa.dad.son=me" }"
                  *
                  */
-                //To do. to convert the entire JsonObject without changing the tokenizer position.
+                // To do. to convert the entire JsonObject without changing the tokenizer position.
                 path.append(currentFieldName);
-                parsedFields.append(this.parser.toString() );
-//              parsedFields.append(this.parser.mapOrdered().toString() );
+                parsedFields.append(this.parser.toString());
+                // parsedFields.append(this.parser.mapOrdered().toString() );
                 builder.field(currentFieldName + "_key", currentFieldName);
                 builder.field(currentFieldName + "_value", parsedFields.toString());
                 builder.field(currentFieldName + "_pathAndValue", path + "=" + parsedFields.toString());
                 parseToken();
-            }
-            else{
-                path.append("."+currentFieldName);
+            } else {
+                path.append("." + currentFieldName);
                 parseValue(currentFieldName, parsedFields);
                 builder.field(currentFieldName + "_key", currentFieldName);
                 builder.field(currentFieldName + "_value", parsedFields.toString());
@@ -128,15 +127,15 @@ public class KeyValueJsonXContentParser extends AbstractXContentParser {
                 break;
             // Handle other token types as needed
             // ToDo, what do we do, if encountered these fields?
-                // should never get to START_OBJECT
+            // should never get to START_OBJECT
             case START_OBJECT:
                 throw new IOException("Unsupported token type");
             case FIELD_NAME:
                 // should never get to FIELD_NAME
                 logger.info("token is FIELD_NAME: " + this.parser.currentName() + "\n");
                 break;
-            case  VALUE_EMBEDDED_OBJECT:
-                logger.info("token is VALUE_EMBEDDED_OBJECT: " + this.parser.objectText()+ "\n");
+            case VALUE_EMBEDDED_OBJECT:
+                logger.info("token is VALUE_EMBEDDED_OBJECT: " + this.parser.objectText() + "\n");
                 break;
             default:
                 throw new IOException("Unsupported token type [" + parser.currentToken() + "]");

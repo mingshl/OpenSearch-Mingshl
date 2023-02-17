@@ -8,7 +8,6 @@
 
 package org.opensearch.flatobject.xcontent;
 
-import org.junit.Test;
 import org.opensearch.common.bytes.BytesReference;
 import org.opensearch.common.xcontent.DeprecationHandler;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
@@ -27,8 +26,7 @@ import static org.junit.Assert.assertEquals;
 public class KeyValueJsonXContentParserTests {
     private static final Logger logger = Logger.getLogger((FlatObjectFieldMapper.class.getName()));
 
-    @Test
-    public void testKeyValueJsonXContentParserTests() throws IOException {
+    public void testKeyValueJsonXContentParser() throws IOException {
 
         NamedXContentRegistry xContentRegistry = NamedXContentRegistry.EMPTY;
         DeprecationHandler deprecationHandler = DeprecationHandler.IGNORE_DEPRECATIONS;

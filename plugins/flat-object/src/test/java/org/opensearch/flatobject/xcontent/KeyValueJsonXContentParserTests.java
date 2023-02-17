@@ -17,13 +17,14 @@ import org.opensearch.common.xcontent.XContentParser;
 import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.common.xcontent.json.JsonXContent;
 import org.opensearch.flatobject.mapper.FlatObjectFieldMapper;
+import org.opensearch.test.OpenSearchTestCase;
 
 import java.io.IOException;
 import java.util.logging.Logger;
 
 import static org.junit.Assert.assertEquals;
 
-public class KeyValueJsonXContentParserTests {
+public class KeyValueJsonXContentParserTests extends OpenSearchTestCase {
     private static final Logger logger = Logger.getLogger((FlatObjectFieldMapper.class.getName()));
 
     public void testKeyValueJsonXContentParser() throws IOException {

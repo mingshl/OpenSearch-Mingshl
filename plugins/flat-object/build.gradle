@@ -11,7 +11,6 @@
 
 import org.opensearch.gradle.test.RestIntegTestTask
 
-//apply plugin: 'opensearch.opensearchplugin'
 apply plugin: 'opensearch.yaml-rest-test'
 apply plugin: 'opensearch.internal-cluster-test'
 
@@ -31,32 +30,57 @@ restResources {
   }
 }
 
-task integTest(type: RestIntegTestTask) {
-  description = "Run tests against a cluster"
-  testClassesDirs = sourceSets.test.output.classesDirs
-  classpath = sourceSets.test.runtimeClasspath
-}
-tasks.named("check").configure { dependsOn(integTest) }
+/**
+ * This block and "RestIntegTestTask" package import need to be removed before we merge the plugin to upstream.
+ *
+ * This block was added to allow for local testing of the plugin by deploying it into testcluster ("./gradlew run").
+ * However, it causes GitHub CI to fail due to:
+ * ---
+ * > Task :plugins:flat-object:testingConventions FAILED
+ * Expected at least one test class included in task :plugins:flat-object:integTest, but found none.
+ *
+ * FAILURE: Build failed with an exception.
+ *
+ *  * What went wrong:
+ *  Execution failed for task ':plugins:flat-object:testingConventions'.
+ *  > Testing conventions [Expected at least one test class included in task :plugins:flat-object:integTest, but found none.] are not honored
+ * ---
+ * The workaround was to make it conditional so that it is on included in CI run.
+ * This means that local testing now needs to be called like this:
+ * ---
+ * ./gradle -PisLocal run
+ * ---
+ */
+if (project.hasProperty("isLocal")) {
 
-integTest {
-  // The --debug-jvm command-line option makes the cluster debuggable; this makes the tests debuggable
-  if (System.getProperty("test.debug") != null) {
-    jvmArgs '-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005'
+  task integTest(type: RestIntegTestTask) {
+    description = "Run tests against a cluster"
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
   }
-}
+  tasks.named("check").configure { dependsOn(integTest) }
 
-testClusters.integTest {
-  testDistribution = "INTEG_TEST"
+  integTest {
+    // The --debug-jvm command-line option makes the cluster debuggable; this makes the tests debuggable
+    if (System.getProperty("test.debug") != null) {
+      jvmArgs '-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005'
+    }
+  }
 
-  // This installs our plugin into the testClusters
-  plugin(project.tasks.bundlePlugin.archiveFile)
-}
+  testClusters.integTest {
+    testDistribution = "INTEG_TEST"
 
-// Uncommend the following if you want to spin up testcluster with more than one node.
-//testClusters.all {
-//  numberOfNodes = 2
-//}
+    // This installs our plugin into the testClusters
+    plugin(project.tasks.bundlePlugin.archiveFile)
+  }
 
-run {
-  useCluster testClusters.integTest
+  // Uncommend the following if you want to spin up testcluster with more than one node.
+  //testClusters.all {
+  //  numberOfNodes = 2
+  //}
+
+  run {
+    useCluster testClusters.integTest
+  }
+
 }

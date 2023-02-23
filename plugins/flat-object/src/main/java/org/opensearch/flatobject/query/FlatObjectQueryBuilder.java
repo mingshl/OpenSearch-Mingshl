@@ -9,6 +9,8 @@
 package org.opensearch.flatobject.query;
 
 import org.apache.lucene.search.Query;
+import org.opensearch.common.ParsingException;
+import org.opensearch.common.Strings;
 import org.opensearch.common.io.stream.StreamInput;
 import org.opensearch.common.io.stream.StreamOutput;
 import org.opensearch.common.xcontent.XContentBuilder;
@@ -16,17 +18,39 @@ import org.opensearch.common.xcontent.XContentParser;
 import org.opensearch.index.query.AbstractQueryBuilder;
 import org.opensearch.index.query.QueryBuilder;
 import org.opensearch.index.query.QueryShardContext;
+import org.opensearch.index.query.TempWorkaround;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
 
 public class FlatObjectQueryBuilder extends AbstractQueryBuilder<FlatObjectQueryBuilder> {
 
     public static final String NAME = "flat-object";
 
-    public FlatObjectQueryBuilder() {}
+    private final String fieldName;
+    private final List<?> values;
+
+    public FlatObjectQueryBuilder(String fieldName, Object... values) {
+        this(fieldName, values != null ? Arrays.asList(values) : (Iterable<?>) null);
+    }
+
+    public FlatObjectQueryBuilder(String fieldName, Iterable<?> values) {
+        if (Strings.isEmpty(fieldName)) {
+            throw new IllegalArgumentException("field name cannot be null.");
+        }
+        if (values == null) {
+            throw new IllegalArgumentException("No value specified for flat-object query.");
+        }
+        this.fieldName = fieldName;
+        this.values = values == null ? null : TempWorkaround.convert(values);
+    }
 
     public FlatObjectQueryBuilder(StreamInput in) throws IOException {
         super(in);
+        fieldName = in.readString();
+        values = (List<?>) in.readGenericValue();
     }
 
     /**
@@ -37,15 +61,13 @@ public class FlatObjectQueryBuilder extends AbstractQueryBuilder<FlatObjectQuery
 
     @Override
     public String getWriteableName() {
-        return null;
+        return NAME;
     }
 
     @Override
-    protected void doWriteTo(StreamOutput out) throws IOException {}
-
-    @Override
-    protected void doXContent(XContentBuilder builder, Params params) throws IOException {
-        // TODO
+    protected void doWriteTo(StreamOutput out) throws IOException {
+        out.writeString(fieldName);
+        out.writeGenericValue(values);
     }
 
     @Override
@@ -56,29 +78,73 @@ public class FlatObjectQueryBuilder extends AbstractQueryBuilder<FlatObjectQuery
 
     @Override
     protected boolean doEquals(FlatObjectQueryBuilder other) {
-        // TODO
-        return false;
+        return Objects.equals(fieldName, other.fieldName) && Objects.equals(values, other.values);
     }
 
     @Override
     protected int doHashCode() {
-        // TODO
-        return 0;
+        return Objects.hash(fieldName, values);
     }
 
-    public static QueryBuilder fromXContent(XContentParser xContentParser) throws IOException {
+    @Override
+    protected void doXContent(XContentBuilder builder, Params params) throws IOException {
+        builder.startObject(NAME);
+        builder.field(fieldName, TempWorkaround.convertBack(values));
+        printBoostAndQueryName(builder);
+        builder.endObject();
+    }
+
+    public static QueryBuilder fromXContent(XContentParser parser) throws IOException {
+        String fieldName = null;
+        List<Object> values = null;
+
         float boost = AbstractQueryBuilder.DEFAULT_BOOST;
         String type = null;
         String id = null;
         String queryName = null;
-        String currentFieldName = null;
-        XContentParser.Token token;
 
         // TODO depends on parser methods
+        XContentParser.Token token;
+        String currentFieldName = null;
+        while ((token = parser.nextToken()) != XContentParser.Token.END_OBJECT) {
+            if (token == XContentParser.Token.FIELD_NAME) {
+                currentFieldName = parser.currentName();
+            } else if (token == XContentParser.Token.START_ARRAY) {
+                if (fieldName != null) {
+                    throw new ParsingException(
+                        parser.getTokenLocation(),
+                        "[" + FlatObjectQueryBuilder.NAME + "] query does not support multiple fields"
+                    );
+                }
+                fieldName = currentFieldName;
+                values = TempWorkaround.parseValues(parser);
+            } else if (token.isValue()) {
+                // Boost support?
+                if (AbstractQueryBuilder.BOOST_FIELD.match(currentFieldName, parser.getDeprecationHandler())) {
+                    boost = parser.floatValue();
+                } else if (AbstractQueryBuilder.NAME_FIELD.match(currentFieldName, parser.getDeprecationHandler())) {
+                    queryName = parser.text();
+                } else {
+                    throw new ParsingException(
+                        parser.getTokenLocation(),
+                        "[" + FlatObjectQueryBuilder.NAME + "] query does not support [" + currentFieldName + "]"
+                    );
+                }
+            } else {
+                throw new ParsingException(
+                    parser.getTokenLocation(),
+                    "[" + FlatObjectQueryBuilder.NAME + "] unknown token [" + token + "] after [" + currentFieldName + "]"
+                );
+            }
+        }
 
-        FlatObjectQueryBuilder queryBuilder = new FlatObjectQueryBuilder();
-        queryBuilder.queryName(queryName);
-        queryBuilder.boost(boost);
-        return queryBuilder;
+        if (fieldName == null) {
+            throw new ParsingException(
+                parser.getTokenLocation(),
+                "[" + FlatObjectQueryBuilder.NAME + "] query requires a field name, " + "followed by array"
+            );
+        }
+
+        return new FlatObjectQueryBuilder(fieldName, values).queryName(queryName).boost(boost);
     }
 }

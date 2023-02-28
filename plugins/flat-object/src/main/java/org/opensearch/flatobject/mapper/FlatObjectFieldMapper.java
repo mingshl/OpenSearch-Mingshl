@@ -18,16 +18,19 @@ import org.apache.lucene.search.MultiTermQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.util.BytesRef;
 import org.opensearch.common.Nullable;
+import org.opensearch.common.collect.Iterators;
 import org.opensearch.common.lucene.Lucene;
 import org.opensearch.common.xcontent.DeprecationHandler;
 import org.opensearch.common.xcontent.NamedXContentRegistry;
 import org.opensearch.common.xcontent.XContentParser;
-import org.opensearch.flatobject.xcontent.KeyValueJsonXContentParser;
+import org.opensearch.flatobject.xcontent.JsonToStringXContentParser;
 import org.opensearch.index.analysis.IndexAnalyzers;
 import org.opensearch.index.analysis.NamedAnalyzer;
 import org.opensearch.index.fielddata.IndexFieldData;
 import org.opensearch.index.fielddata.plain.SortedSetOrdinalsIndexFieldData;
 import org.opensearch.index.mapper.FieldMapper;
+import org.opensearch.index.mapper.KeywordFieldMapper;
+import org.opensearch.index.mapper.Mapper;
 import org.opensearch.index.mapper.MapperParsingException;
 import org.opensearch.index.mapper.ParametrizedFieldMapper;
 import org.opensearch.index.mapper.ParseContext;
@@ -43,8 +46,10 @@ import org.opensearch.search.lookup.SearchLookup;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -53,21 +58,30 @@ import java.util.function.Supplier;
 import java.util.logging.Logger;
 
 /**
- * A field mapper for flat-objects. This mapper accepts strings and indexes them as-is.
- * starting from keywordfieldmapper
+ * A field mapper for flat-objects. This mapper accepts JSON object and treat as string fields in one index.
  * @opensearch.internal
  */
 public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
     /**
-     * logging function
+     * logging function:
+     * To remove after draft PR
      */
 
     private static final Logger logger = Logger.getLogger((FlatObjectFieldMapper.class.getName()));
-    public static final String CONTENT_TYPE = "flat-object";
 
     /**
-     * Default parameters
-     *
+     * A flat-object mapping contains one parent field itself and two substring fields,
+     * field._valueAndPath and field._value
+     */
+
+    public static final String CONTENT_TYPE = "flat-object";
+    private static final String VALUE_AND_PATH_SUFFIX = "._valueAndPath";
+    private static final String VALUE_SUFFIX = "._value";
+
+    /**
+     * Default parameters, similar to keyword
+     * In flat-object, three fields are treated as keyword fields with the same parameters
+     * Cannot be tokenized, can OmitNorms, and can setIndexOption.
      * @opensearch.internal
      */
     public static class Defaults {
@@ -99,13 +113,14 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
     }
 
     /**
-     * The builder for the field mapper
-     *
+     * The builder for the flat-object field mapper
+     * Set the same parameters from keywordFieldMapper.Builder
      * @opensearch.internal
      */
     public static class Builder extends ParametrizedFieldMapper.Builder {
 
         private final Parameter<Boolean> indexed = Parameter.indexParam(m -> toType(m).indexed, true);
+
         private final Parameter<Boolean> hasDocValues = Parameter.docValuesParam(m -> toType(m).hasDocValues, true);
         private final Parameter<Boolean> stored = Parameter.storeParam(m -> toType(m).fieldType.stored(), false);
 
@@ -146,7 +161,6 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
 
         private final Parameter<Map<String, String>> meta = Parameter.metaParam();
         private final Parameter<Float> boost = Parameter.boostParam();
-
         private final IndexAnalyzers indexAnalyzers;
 
         public Builder(String name, IndexAnalyzers indexAnalyzers) {
@@ -178,6 +192,15 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
             return this;
         }
 
+        public Builder index(boolean index) {
+            return this;
+        }
+
+        public Builder store(boolean store) {
+            this.stored.setValue(store);
+            return this;
+        }
+
         @Override
         protected List<Parameter<?>> getParameters() {
             return Arrays.asList(
@@ -197,7 +220,11 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
             );
         }
 
-        private FlatObjectFieldType buildFieldType(BuilderContext context, FieldType fieldType) {
+        /**
+         * FlatObjectFieldType is the parent field type. the parent field enables KEYWORD_ANALYZER,
+         * allows normalizer and splitQueriesOnWhitespace
+         */
+        private FlatObjectFieldType buildFlatObjectFieldType(BuilderContext context, FieldType fieldType) {
             NamedAnalyzer normalizer = Lucene.KEYWORD_ANALYZER;
             NamedAnalyzer searchAnalyzer = Lucene.KEYWORD_ANALYZER;
             String normalizerName = this.normalizer.getValue();
@@ -218,16 +245,58 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
             return new FlatObjectFieldType(buildFullName(context), fieldType, normalizer, searchAnalyzer, this);
         }
 
+        /**
+         * ValueFieldMapper is the sub field type for values in the Json.
+         * use a keywordfieldtype
+         */
+        private ValueFieldMapper buildValueFieldMapper(BuilderContext context, FieldType fieldType, FlatObjectFieldType fft) {
+            String fullName = buildFullName(context);
+            FieldType vft = new FieldType(fieldType);
+            vft.setOmitNorms(true);
+            KeywordFieldMapper.KeywordFieldType valueFieldType = new KeywordFieldMapper.KeywordFieldType(fullName + "._value", vft);
+            // TODO: revisit analyzer object
+            fft.setValueFieldType(valueFieldType);
+            return new ValueFieldMapper(vft, valueFieldType);
+
+        }
+
+        /**
+         * ValueAndPathFieldMapper is the sub field type for path=value format in the Json.
+         * also use a keywordfieldtype
+         */
+        private ValueAndPathFieldMapper buildValueAndPathFieldMapper(BuilderContext context, FieldType fieldType, FlatObjectFieldType fft) {
+
+            String fullName = buildFullName(context);
+            FieldType vft = new FieldType(fieldType);
+            vft.setOmitNorms(true);
+            KeywordFieldMapper.KeywordFieldType ValueAndPathFieldType = new KeywordFieldMapper.KeywordFieldType(
+                fullName + "._valueAndPath",
+                vft
+            );
+            // TODO: revisit analyzer object
+            fft.setValueAndPathFieldType(ValueAndPathFieldType);
+            return new ValueAndPathFieldMapper(vft, ValueAndPathFieldType);
+        }
+
+        /**
+         * FlatObjectFieldMapper builds the FLatObjectFieldMapper itself, and also build the two sub fieldMappers:
+         * ValueFieldMapper and ValueAndPathFieldMapper
+         * @param context
+         * @return
+         */
         @Override
         public FlatObjectFieldMapper build(BuilderContext context) {
             FieldType fieldtype = new FieldType(Defaults.FIELD_TYPE);
             fieldtype.setOmitNorms(this.hasNorms.getValue() == false);
             fieldtype.setIndexOptions(TextParams.toIndexOptions(this.indexed.getValue(), this.indexOptions.getValue()));
             fieldtype.setStored(this.stored.getValue());
+            FlatObjectFieldType fft = buildFlatObjectFieldType(context, fieldtype);
             return new FlatObjectFieldMapper(
                 name,
                 fieldtype,
-                buildFieldType(context, fieldtype),
+                fft,
+                buildValueFieldMapper(context, fieldtype, fft),
+                buildValueAndPathFieldMapper(context, fieldtype, fft),
                 multiFieldsBuilder.build(this, context),
                 copyTo.build(),
                 this
@@ -239,13 +308,17 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
 
     /**
      * Field type for flat-object fields
-     *
+     * one flat-object fields contains its own fieldType, one valueFieldType and one valueAndPathFieldType
      * @opensearch.internal
      */
     public static final class FlatObjectFieldType extends StringFieldType {
 
         private final int ignoreAbove;
         private final String nullValue;
+
+        private KeywordFieldMapper.KeywordFieldType valueFieldType;
+
+        private KeywordFieldMapper.KeywordFieldType valueAndPathFieldType;
 
         public FlatObjectFieldType(
             String name,
@@ -297,6 +370,22 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
             super(name, true, false, true, new TextSearchInfo(Defaults.FIELD_TYPE, null, analyzer, analyzer), Collections.emptyMap());
             this.ignoreAbove = Integer.MAX_VALUE;
             this.nullValue = null;
+        }
+
+        void setValueFieldType(KeywordFieldMapper.KeywordFieldType valueFieldType) {
+            this.valueFieldType = valueFieldType;
+        }
+
+        void setValueAndPathFieldType(KeywordFieldMapper.KeywordFieldType ValueAndPathFieldType) {
+            this.valueAndPathFieldType = ValueAndPathFieldType;
+        }
+
+        public KeywordFieldMapper.KeywordFieldType getValueFieldType() {
+            return this.valueFieldType;
+        }
+
+        public KeywordFieldMapper.KeywordFieldType getValueAndPathFieldType() {
+            return this.valueAndPathFieldType;
         }
 
         @Override
@@ -396,6 +485,8 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
     private final SimilarityProvider similarity;
     private final String normalizerName;
     private final boolean splitQueriesOnWhitespace;
+    private final ValueFieldMapper valueFieldMapper;
+    private final ValueAndPathFieldMapper valueAndPathFieldMapper;
 
     private final IndexAnalyzers indexAnalyzers;
 
@@ -403,6 +494,8 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
         String simpleName,
         FieldType fieldType,
         FlatObjectFieldType mappedFieldType,
+        ValueFieldMapper valueFieldMapper,
+        ValueAndPathFieldMapper valueAndPathFieldMapper,
         MultiFields multiFields,
         CopyTo copyTo,
         Builder builder
@@ -419,11 +512,14 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
         this.similarity = builder.similarity.getValue();
         this.normalizerName = builder.normalizer.getValue();
         this.splitQueriesOnWhitespace = builder.splitQueriesOnWhitespace.getValue();
-
         this.indexAnalyzers = builder.indexAnalyzers;
+        this.valueFieldMapper = valueFieldMapper;
+        this.valueAndPathFieldMapper = valueAndPathFieldMapper;
     }
 
-    /** Values that have more chars than the return value of this method will
+    /**
+     * TODO: Placeholder, this is used at keywordfieldmapper, considering to remove ignoreAbove
+     * Values that have more chars than the return value of this method will
      *  be skipped at parsing time. */
     public int ignoreAbove() {
         return ignoreAbove;
@@ -448,13 +544,16 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
             value = context.externalValue().toString();
             ParseValueAddFields(context, value, fieldType().name());
         } else {
-            KeyValueJsonXContentParser KeyValueJsonParser = new KeyValueJsonXContentParser(
+            JsonToStringXContentParser JsonToStringParser = new JsonToStringXContentParser(
                 NamedXContentRegistry.EMPTY,
                 DeprecationHandler.IGNORE_DEPRECATIONS,
                 context,
                 fieldType().name()
             );
-            XContentParser parser = KeyValueJsonParser.parseObject();
+            /**
+             * JsonToStringParser is the main parser class to transform JSON into stringFields in a XContentParser
+             */
+            XContentParser parser = JsonToStringParser.parseObject();
 
             XContentParser.Token currentToken;
             while ((currentToken = parser.nextToken()) != XContentParser.Token.END_OBJECT) {
@@ -476,6 +575,23 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
 
     }
 
+    @Override
+    public Iterator<Mapper> iterator() {
+        List<Mapper> subIterators = new ArrayList<>();
+        if (valueFieldMapper != null) {
+            subIterators.add(valueFieldMapper);
+        }
+        if (valueAndPathFieldMapper != null) {
+            subIterators.add(valueAndPathFieldMapper);
+        }
+        if (subIterators.size() == 0) {
+            return super.iterator();
+        }
+        @SuppressWarnings("unchecked")
+        Iterator<Mapper> concat = Iterators.concat(super.iterator(), subIterators.iterator());
+        return concat;
+    }
+
     private void ParseValueAddFields(ParseContext context, String value, String fieldName) throws IOException {
         if (value == null || value.length() > ignoreAbove) {
             return;
@@ -485,55 +601,59 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
         if (normalizer != null) {
             value = normalizeValue(normalizer, name(), value);
         }
-        // logger.info("FlatObjectField name is " + fieldType().name());
-        // logger.info("FlatObjectField name is " + fieldName.split("_")[0]);
-        // Field field = new FlatObjectField(fieldName.split("_")[0], binaryValue, fieldType);
 
-        String[] stringPartType = fieldName.split("_");
+        String[] valueTypeList = fieldName.split("\\._");
+        String valueType = "._" + valueTypeList[valueTypeList.length - 1];
+        logger.info("valueType: " + valueType);
+        /**
+         * the JsonToStringXContentParser returns XContentParser with 3 string fields
+         * fieldName, fieldName._value, fieldName._valueAndPath
+         */
 
         if (fieldType.indexOptions() != IndexOptions.NONE || fieldType.stored()) {
-            logger.info("FlatObjectField name is " + fieldName);
+            logger.info("FlatObjectField name is " + fieldType().name());
             logger.info("FlatObjectField value is " + value);
             // convert to utf8 only once before feeding postings/dv/stored fields
-            final BytesRef pathAndValueBinaryValue = new BytesRef(value);
-            Field pathAndValueField = new FlatObjectField(fieldType().name(), pathAndValueBinaryValue, fieldType);
-            context.doc().add(pathAndValueField);
-            if (fieldType().hasDocValues()) {
-                context.doc().add(new SortedSetDocValuesField(fieldType().name(), pathAndValueBinaryValue));
-            }
-            // switch (stringPartType[stringPartType.length-1]) {
-            // case "pathAndValue":
-            // logger.info("FlatObjectField name is " + fieldName);
-            // logger.info("FlatObjectField value is " + value);
-            // // convert to utf8 only once before feeding postings/dv/stored fields
-            // final BytesRef pathAndValueBinaryValue = new BytesRef( value);
-            // Field pathAndValueField = new FlatObjectField(fieldType().name()+".pathAndValue", pathAndValueBinaryValue, fieldType);
-            // context.doc().add(pathAndValueField);
-            // if (fieldType().hasDocValues()) {
-            // context.doc().add(new SortedSetDocValuesField(fieldType().name()+".pathAndValue", pathAndValueBinaryValue));
-            // }
-            // break;
-            // default:
-            // logger.info("FlatObjectField name is " + fieldName);
-            // logger.info("FlatObjectField value is " + value);
-            // // convert to utf8 only once before feeding postings/dv/stored fields
-            // final BytesRef binaryValue = new BytesRef(value);
-            // Field field = new FlatObjectField(fieldType().name(), binaryValue, fieldType);
-            // context.doc().add(field);
-            //
-            // if (fieldType().hasDocValues()) {
-            // context.doc().add(new SortedSetDocValuesField(fieldType().name(), binaryValue));
-            // }
-            // break;
-            //
-            //
-            // }
-            // TO do, revisit what omitNorms should work for flat-object
-            if (fieldType().hasDocValues() == false && fieldType.omitNorms()) {
+
+            final BytesRef binaryValue = new BytesRef(value);
+            Field field = new FlatObjectField(fieldType().name(), binaryValue, fieldType);
+
+            if (fieldType.omitNorms() && !fieldType().hasDocValues()) {
                 createFieldNamesField(context);
             }
+            /**
+             * Indentified by the stringfield name,
+             * fieldName will be store through the parent FlatFieldMapper,which contains all the keys
+             * fieldName._value will be store through the valueFieldMapper, which contains the values of the Json Object
+             * fieldName._valueAndPath will be store through the valueAndPathFieldMapper, which contains the values of
+             * the Json Object.
+             */
+            if (fieldName.equals(fieldType().name())) {
+                context.doc().add(field);
+            }
+            if (valueType.equals(VALUE_SUFFIX)) {
+                if (valueFieldMapper != null) {
+                    logger.info("valueFieldMapper value is " + value);
+                    valueFieldMapper.addField(context, value);
+                }
+            }
+            if (valueType.equals(VALUE_AND_PATH_SUFFIX)) {
+                if (valueAndPathFieldMapper != null) {
+                    logger.info("valueAndPathFieldMapper value is " + value);
+                    valueAndPathFieldMapper.addField(context, value);
+                }
+            }
+
+            // TODo: to revisit if flat-object needs docValues.
+            if (fieldType().hasDocValues()) {
+                if (context.doc().getField(fieldType().name()) == null || !context.doc().getFields(fieldType().name()).equals(field)) {
+                    context.doc().add(new SortedSetDocValuesField(fieldType().name(), binaryValue));
+                }
+            }
+
         }
 
+>>>>>>> efbb2693877 (Add two subfields ._value and ._valueAndPath)
     }
 
     private static String normalizeValue(NamedAnalyzer normalizer, String field, String value) throws IOException {
@@ -576,4 +696,87 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
     public ParametrizedFieldMapper.Builder getMergeBuilder() {
         return new Builder(simpleName(), indexAnalyzers).init(this);
     }
+
+    // TODO Further simplify the code by new KeyWordFieldMapper to be ValueAndPathFieldMapper and ValueFieldMapper
+    private static final class ValueAndPathFieldMapper extends FieldMapper {
+
+        protected ValueAndPathFieldMapper(FieldType fieldType, KeywordFieldMapper.KeywordFieldType mappedFieldType) {
+            super(mappedFieldType.name(), fieldType, mappedFieldType, MultiFields.empty(), CopyTo.empty());
+        }
+
+        void addField(ParseContext context, String value) {
+            // context.doc().add(new Field(fieldType().name(), value, fieldType));
+            final BytesRef binaryValue = new BytesRef(value);
+            if (fieldType.indexOptions() != IndexOptions.NONE || fieldType.stored()) {
+                Field field = new KeywordFieldMapper.KeywordField(fieldType().name(), binaryValue, fieldType);
+                // Field field = new (fieldType().name()+VALUE_AND_PATH_SUFFIX, binaryValue, fieldType);
+
+                context.doc().add(field);
+
+                if (fieldType().hasDocValues() == false && fieldType.omitNorms()) {
+                    createFieldNamesField(context);
+                }
+            }
+        }
+
+        @Override
+        protected void parseCreateField(ParseContext context) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        protected void mergeOptions(FieldMapper other, List<String> conflicts) {
+
+        }
+
+        @Override
+        protected String contentType() {
+            return "valueAndPath";
+        }
+
+        @Override
+        public String toString() {
+            return fieldType().toString();
+        }
+    }
+
+    private static final class ValueFieldMapper extends FieldMapper {
+
+        protected ValueFieldMapper(FieldType fieldType, KeywordFieldMapper.KeywordFieldType mappedFieldType) {
+            super(mappedFieldType.name(), fieldType, mappedFieldType, MultiFields.empty(), CopyTo.empty());
+        }
+
+        void addField(ParseContext context, String value) {
+            final BytesRef binaryValue = new BytesRef(value);
+            if (fieldType.indexOptions() != IndexOptions.NONE || fieldType.stored()) {
+                Field field = new KeywordFieldMapper.KeywordField(fieldType().name(), binaryValue, fieldType);
+                context.doc().add(field);
+
+                if (fieldType().hasDocValues() == false && fieldType.omitNorms()) {
+                    createFieldNamesField(context);
+                }
+            }
+        }
+
+        @Override
+        protected void parseCreateField(ParseContext context) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        protected void mergeOptions(FieldMapper other, List<String> conflicts) {
+
+        }
+
+        @Override
+        protected String contentType() {
+            return "value";
+        }
+
+        @Override
+        public String toString() {
+            return fieldType().toString();
+        }
+    }
+
 }

@@ -54,7 +54,7 @@ import java.util.concurrent.TimeUnit;
 
 @State(Scope.Thread)
 @Fork(1)
-@Warmup(iterations = 1, time = 1, timeUnit = TimeUnit.SECONDS)
+@Warmup(iterations = 10, time = 1, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 100, time = 1, timeUnit = TimeUnit.SECONDS)
 
 public class FlatObjectMappingBenchmark {
@@ -92,6 +92,11 @@ public class FlatObjectMappingBenchmark {
         DeleteIndex(state, "demo-dynamic-test");
     }
 
+
+    /**
+     * FlatObjectIndex:
+     * create index and delete index
+     */
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
     @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -99,6 +104,12 @@ public class FlatObjectMappingBenchmark {
         GetFlatObjectIndex(state, "demo-flat-object-test", "host");
         DeleteIndex(state, "demo-flat-object-test");
     }
+
+
+    /**
+     * DynamicIndex:
+     * create index, upload one document and delete index
+     */
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
@@ -111,6 +122,11 @@ public class FlatObjectMappingBenchmark {
         DeleteIndex(state, "demo-dynamic-test1");
     }
 
+
+    /**
+     * FlatObjectIndex:
+     * create index, upload one document and delete index
+     */
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
     @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -122,6 +138,11 @@ public class FlatObjectMappingBenchmark {
         DeleteIndex(state, "demo-flat-object-test1");
     }
 
+
+    /**
+     * DynamicIndex:
+     * create index, upload one document, search for document and delete index
+     */
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
     @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -135,6 +156,11 @@ public class FlatObjectMappingBenchmark {
         DeleteIndex(state, indexName);
     }
 
+
+    /**
+     * FlatObjectIndex:
+     * create index, upload one document, search for document and delete index
+     */
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
     @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -143,45 +169,51 @@ public class FlatObjectMappingBenchmark {
         String doc =
             "{ \"message\": \"[5592:1:0309/123054.737712:ERROR:child_process_sandbox_support_impl_linux.cc(79)] FontService unique font name matching request did not receive a response.\", \"fileset\": { \"name\": \"syslog\" }, \"process\": { \"name\": \"org.gnome.Shell.desktop\", \"pid\": 3383 }, \"@timestamp\": \"2020-03-09T18:00:54.000+05:30\", \"host\": { \"hostname\": \"bionic\", \"name\": \"bionic\" } }";
         UploadDoc(state, "demo-flat-object-test2", doc);
-        SearchDoc(state, "demo-flat-object-test2", "host", "bionic", "@timestamp", "message");
+        SearchDoc(state, "demo-flat-object-test2", "host", "name", "@timestamp", "message");
         DeleteIndex(state, "demo-flat-object-test2");
     }
 
+    /**
+     * DynamicIndex:
+     * create index, upload a nested document in 100 levels, and each level with 10 fields,
+     * search for document and delete index
+     * Caught exceptions with the number of fields over 1000
+     */
+    // @Benchmark
+    // @BenchmarkMode(Mode.AverageTime)
+    // @OutputTimeUnit(TimeUnit.MILLISECONDS)
+    // public void searchDynamicMappingWithOneHundredNestedJSON(MyState state) throws IOException {
+    //
+    // String indexName = "demo-dynamic-test3";
+    // GetDynamicIndex(state, indexName);
+    // String doc = GenerateRandomJson();
+    // Map<String, String> searchValueAndPath = findNestedValueAndPath(doc,99, "field0");
+    // String searchValue = searchValueAndPath.get("value");
+    // String searchFieldName = searchValueAndPath.get("path");
+    // UploadDoc(state, indexName, doc);
+    // SearchDoc(state,indexName,searchFieldName,searchValue,searchValue ,searchFieldName );
+    // DeleteIndex(state, indexName);
+    // }
+
+    /**
+     * FlatObjectIndex:
+     * create index, upload a nested document in 100 levels, and each level with 10 fields,
+     * search for document and delete index
+     * works fine and able to return document
+     */
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
     @OutputTimeUnit(TimeUnit.MILLISECONDS)
-    public void searchDynamicMappingWithOneHundredNestedJSON(MyState state) throws IOException {
-
-        String indexName = "demo-dynamic-test3";
-        DeleteIndex(state, indexName);
-        GetDynamicIndex(state, indexName);
-        String doc = GenerateRandomJson();
-        // String searchValue = getNestedValue(doc,99);
-        Map<String, String> searchValueAndPath = findNestedValueAndPath(doc, 99, "field0");
-        String searchValue = searchValueAndPath.get("value");
-        String searchFieldName = searchValueAndPath.get("path");
-        // String doc = "{ \"message\": \"[5592:1:0309/123054.737712:ERROR:child_process_sandbox_support_impl_linux.cc(79)] FontService
-        // unique font name matching request did not receive a response.\", \"fileset\": { \"name\": \"syslog\" }, \"process\": { \"name\":
-        // \"org.gnome.Shell.desktop\", \"pid\": 3383 }, \"@timestamp\": \"2020-03-09T18:00:54.000+05:30\", \"host\": { \"hostname\":
-        // \"bionic\", \"name\": \"bionic\" } }";
-        UploadDoc(state, indexName, doc);
-        SearchDoc(state, indexName, searchFieldName, searchValue, searchValue, searchFieldName);
-        DeleteIndex(state, indexName);
-    }
-
-    @Benchmark
-    @BenchmarkMode(Mode.AverageTime)
-    @OutputTimeUnit(TimeUnit.MILLISECONDS)
-    public void searchFlatObjectMappingWithOneHundredNestedJSON(MyState state) throws IOException {
-
-        String indexName = "demo-flat-object-test3";
-        // DeleteIndex(state, indexName);
+    public void searchFlatObjectMappingInValueWithOneHundredNestedJSON(MyState state) throws IOException {
+        String indexName = "demo-flat-object-test4";
         GetFlatObjectIndex(state, indexName, "nested0");
-        String doc = GenerateRandomJson();
-        Map<String, String> searchValueAndPath = findNestedValueAndPath(doc, 99, "nested0");
+        String doc = GenerateRandomJson(100, "nested");
+        Map<String, String> searchValueAndPath = findNestedValueAndPath(doc, 6, "nested0");
+        String SearchRandomWord = searchValueAndPath.get("value");
+        String SearchRandomPath = "nested0._value";
         String searchFieldName = "nested0";
         UploadDoc(state, indexName, doc);
-        SearchDoc(state, indexName, searchFieldName, "field40.4", searchFieldName, searchFieldName);
+        SearchDoc(state, indexName, SearchRandomPath, SearchRandomWord, searchFieldName, searchFieldName);
         DeleteIndex(state, indexName);
     }
 
@@ -267,31 +299,31 @@ public class FlatObjectMappingBenchmark {
         }
     }
 
-    private static String GenerateRandomJson() {
+
+    private static String GenerateRandomJson(int numberOfNestedLevel, String subObjectName) {
         JSONObject json = new JSONObject();
         Random random = new Random();
 
         // Create 100 nested levels
-        for (int i = 0; i < 100; i++) {
+
+        for (int i = 0; i < numberOfNestedLevel; i++) {
             JSONObject nestedObject = new JSONObject();
 
             // Add 10 fields to each nested level
             for (int j = 0; j < 10; j++) {
-                String field = "field" + i + "." + j;
+                String field = "field" + j;
                 String value = generateRandomString(random);
                 nestedObject.put(field, value);
             }
 
             // Add the nested object to the parent object
-
-            String nestedObjectName = "nested" + i;
+            String nestedObjectName = subObjectName + i;
             json.put(nestedObjectName, nestedObject);
         }
 
         // Return the JSON document as a string
         JSONObject returnJson = new JSONObject();
-        returnJson.put("nested0", json);
-        // System.out.println("createdRandomJSONString is: " + returnJson.toString());
+        returnJson.put(subObjectName + "0", json);
         return returnJson.toString();
     }
 
@@ -311,57 +343,31 @@ public class FlatObjectMappingBenchmark {
         String targetKey = "field" + levelNumber;
         Map<String, String> result = new HashMap<>();
         Iterator<String> keys = jsonObject.keys();
+        StringBuilder path = new StringBuilder();
         while (keys.hasNext()) {
             String key = keys.next();
-            String path = currentPath + "." + key;
+            if (path.length() == 0) {
+                path.append(currentPath);
+            }
+
             Object value = jsonObject.get(key);
             if (key.equals(targetKey)) {
                 result.put("value", value.toString());
-                result.put("path", path);
-                return result;
+                result.put("path", key);
+                System.out.println("value is " + value.toString());
+                System.out.println("path is " + path.toString());
+                break;
             }
             if (value instanceof JSONObject) {
-                Map<String, String> nestedResult = findNestedValueAndPath(value.toString(), levelNumber, path);
+
+                path.append("." + key);
+
+                Map<String, String> nestedResult = findNestedValueAndPath(value.toString(), levelNumber, path.toString());
                 if (!nestedResult.isEmpty()) {
                     return nestedResult;
                 }
             }
         }
-        return result;
-    }
-
-    private static String getNestedValue(String randomJsonString, int levelNumber) {
-        // Parse the nested JSON document string into a JSONObject
-        JSONObject json = new JSONObject(randomJsonString);
-        // Get the value of the "field" in levelNumber
-        for (int i = 0; i < levelNumber; i++) {
-            json = json.getJSONObject("field" + levelNumber);
-        }
-
-        return json.getString("value");
-    }
-
-    private static Map<String, Object> findValueAndPath(JSONObject jsonObject, String targetValue, String currentPath) {
-        Map<String, Object> result = new HashMap<>();
-
-        for (String key : jsonObject.keySet()) {
-            Object value = jsonObject.get(key);
-            String path = currentPath + "/" + key;
-
-            if (value instanceof JSONObject) {
-                Map<String, Object> innerResult = findValueAndPath((JSONObject) value, targetValue, path);
-
-                if (!innerResult.isEmpty()) {
-                    result.putAll(innerResult);
-                    break;
-                }
-            } else if (value instanceof String && value.equals(targetValue)) {
-                result.put("value", value);
-                result.put("path", path);
-                break;
-            }
-        }
-
         return result;
     }
 

@@ -83,3 +83,22 @@ spotless {
     targetExclude 'src/main/generated/**/*.java'
   }
 }
+//plugins {
+//  id 'java-library'
+//  id "me.champeau.jmh" version "0.6.8"
+//}
+//
+//repositories {
+//  mavenCentral()
+//}
+//
+//dependencies {
+//  implementation project(':server')
+//  implementation project(':client:opensearch-rest-high-level-client')
+//
+//  // Dependencies required by JMH micro benchmark
+//  api group: 'org.openjdk.jmh', name: 'jmh-core', version: '1.36'
+//  annotationProcessor group: 'org.openjdk.jmh', name: 'jmh-generator-annprocess', version: '1.36'
+//}
+//
+//compileJava.options.compilerArgs.addAll(["-processor", "org.openjdk.jmh.generators.BenchmarkProcessor"])

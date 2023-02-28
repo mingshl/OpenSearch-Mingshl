@@ -20,6 +20,7 @@ import org.opensearch.flatobject.mapper.FlatObjectFieldMapper;
 import org.opensearch.test.OpenSearchTestCase;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.logging.Logger;
 
 import static org.junit.Assert.assertEquals;
@@ -33,8 +34,10 @@ public class KeyValueJsonXContentParserTests extends OpenSearchTestCase {
         DeprecationHandler deprecationHandler = DeprecationHandler.IGNORE_DEPRECATIONS;
 
         try (XContentBuilder builder = XContentBuilder.builder(JsonXContent.jsonXContent)) {
+            HashSet<String> valueSet = new HashSet<String>();
+            valueSet.add("title");
             builder.startObject();
-            builder.field("catalog", "{title: Lucene in Action}");
+            builder.field("catalog", valueSet);
             builder.endObject();
             String jString = XContentHelper.convertToJson(BytesReference.bytes(builder), false, XContentType.JSON);
 
@@ -53,7 +56,8 @@ public class KeyValueJsonXContentParserTests extends OpenSearchTestCase {
                             break;
                         case VALUE_STRING:
                             value = parser.textOrNull();
-                            assertEquals(value, "{title: Lucene in Action}");
+                            // assertEquals(value, "{title: Lucene in Action}");
+                            assertEquals(value, "title");
                             break;
 
                     }

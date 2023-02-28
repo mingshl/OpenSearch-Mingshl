@@ -10,6 +10,7 @@ package org.opensearch.flatobject.mapper;
 
 import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.flatobject.FlatObjectPlugin;
+import org.opensearch.index.mapper.MapperService;
 import org.opensearch.index.mapper.MapperTestCase;
 import org.opensearch.plugins.Plugin;
 
@@ -29,6 +30,28 @@ public class FlatObjectFieldMapperTests extends MapperTestCase {
         return org.opensearch.common.collect.List.of(new FlatObjectPlugin());
     }
 
+
+    public final void testExistsQueryDocValuesDisabled() throws IOException {
+        MapperService mapperService = createMapperService(fieldMapping(b -> {
+            minimalMapping(b);
+            b.field("doc_values", false);
+            if (randomBoolean()) {
+                b.field("norms", false);
+            }
+        }));
+        assertExistsQuery(mapperService);
+        assertParseMinimalWarnings();
+    }
+
+    public final void testExistsQueryDocValuesDisabledWithNorms() throws IOException {
+        MapperService mapperService = createMapperService(fieldMapping(b -> {
+            minimalMapping(b);
+            b.field("doc_values", false);
+            b.field("norms", false);
+        }));
+        assertExistsQuery(mapperService);
+        assertParseMinimalWarnings();
+    }
     @Override
     public void minimalMapping(XContentBuilder b) throws IOException {
         b.field("type", FIELD_TYPE);

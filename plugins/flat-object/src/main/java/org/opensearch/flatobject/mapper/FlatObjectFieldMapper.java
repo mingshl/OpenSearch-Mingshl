@@ -252,7 +252,7 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
         private ValueFieldMapper buildValueFieldMapper(BuilderContext context, FieldType fieldType, FlatObjectFieldType fft) {
             String fullName = buildFullName(context);
             FieldType vft = new FieldType(fieldType);
-            vft.setOmitNorms(true);
+            vft.setOmitNorms(this.hasNorms.getValue() == false);
             KeywordFieldMapper.KeywordFieldType valueFieldType = new KeywordFieldMapper.KeywordFieldType(fullName + "._value", vft);
             // TODO: revisit analyzer object
             fft.setValueFieldType(valueFieldType);
@@ -268,7 +268,7 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
 
             String fullName = buildFullName(context);
             FieldType vft = new FieldType(fieldType);
-            vft.setOmitNorms(true);
+            vft.setOmitNorms(this.hasNorms.getValue() == false);
             KeywordFieldMapper.KeywordFieldType ValueAndPathFieldType = new KeywordFieldMapper.KeywordFieldType(
                 fullName + "._valueAndPath",
                 vft
@@ -471,6 +471,7 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
             // query text
             return super.wildcardQuery(value, method, caseInsensitve, true, context);
         }
+
     }
 
     private final boolean indexed;
@@ -616,7 +617,7 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
             final BytesRef binaryValue = new BytesRef(value);
             Field field = new FlatObjectField(fieldType().name(), binaryValue, fieldType);
 
-            if (fieldType.omitNorms() && !fieldType().hasDocValues()) {
+            if (fieldType().hasDocValues()==false && fieldType.omitNorms()) {
                 createFieldNamesField(context);
             }
             /**

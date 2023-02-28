@@ -281,8 +281,6 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
         /**
          * FlatObjectFieldMapper builds the FLatObjectFieldMapper itself, and also build the two sub fieldMappers:
          * ValueFieldMapper and ValueAndPathFieldMapper
-         * @param context
-         * @return
          */
         @Override
         public FlatObjectFieldMapper build(BuilderContext context) {

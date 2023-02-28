@@ -653,7 +653,6 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
 
         }
 
->>>>>>> efbb2693877 (Add two subfields ._value and ._valueAndPath)
     }
 
     private static String normalizeValue(NamedAnalyzer normalizer, String field, String value) throws IOException {

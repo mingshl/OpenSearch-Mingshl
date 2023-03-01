@@ -92,7 +92,6 @@ public class FlatObjectMappingBenchmark {
         DeleteIndex(state, "demo-dynamic-test");
     }
 
-
     /**
      * FlatObjectIndex:
      * create index and delete index
@@ -104,7 +103,6 @@ public class FlatObjectMappingBenchmark {
         GetFlatObjectIndex(state, "demo-flat-object-test", "host");
         DeleteIndex(state, "demo-flat-object-test");
     }
-
 
     /**
      * DynamicIndex:
@@ -122,7 +120,6 @@ public class FlatObjectMappingBenchmark {
         DeleteIndex(state, "demo-dynamic-test1");
     }
 
-
     /**
      * FlatObjectIndex:
      * create index, upload one document and delete index
@@ -137,7 +134,6 @@ public class FlatObjectMappingBenchmark {
         UploadDoc(state, "demo-flat-object-test1", doc);
         DeleteIndex(state, "demo-flat-object-test1");
     }
-
 
     /**
      * DynamicIndex:
@@ -155,7 +151,6 @@ public class FlatObjectMappingBenchmark {
         SearchDoc(state, indexName, "host.hostname", "bionic", "@timestamp", "message");
         DeleteIndex(state, indexName);
     }
-
 
     /**
      * FlatObjectIndex:
@@ -298,7 +293,6 @@ public class FlatObjectMappingBenchmark {
             throw new IOException("No hit is found");
         }
     }
-
 
     private static String GenerateRandomJson(int numberOfNestedLevel, String subObjectName) {
         JSONObject json = new JSONObject();

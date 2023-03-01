@@ -121,7 +121,7 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
 
         private final Parameter<Boolean> indexed = Parameter.indexParam(m -> toType(m).indexed, true);
 
-        private final Parameter<Boolean> hasDocValues = Parameter.docValuesParam(m -> toType(m).hasDocValues, true);
+        private final Parameter<Boolean> hasDocValues = Parameter.docValuesParam(m -> toType(m).hasDocValues, false);
         private final Parameter<Boolean> stored = Parameter.storeParam(m -> toType(m).fieldType.stored(), false);
 
         private final Parameter<String> nullValue = Parameter.stringParam("null_value", false, m -> toType(m).nullValue, null)
@@ -192,9 +192,9 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
             return this;
         }
 
-        public Builder index(boolean index) {
-            return this;
-        }
+        // public Builder index(boolean index) {
+        // return this;
+        // }
 
         public Builder store(boolean store) {
             this.stored.setValue(store);
@@ -540,7 +540,7 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
 
         if (context.externalValueSet()) {
             value = context.externalValue().toString();
-            ParseValueAddFields(context, value, fieldType().name());
+            parseValueAddFields(context, value, fieldType().name());
         } else {
             JsonToStringXContentParser JsonToStringParser = new JsonToStringXContentParser(
                 NamedXContentRegistry.EMPTY,
@@ -563,7 +563,7 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
                     case VALUE_STRING:
                         value = parser.textOrNull();
                         logger.info("value: " + value);
-                        ParseValueAddFields(context, value, fieldName);
+                        parseValueAddFields(context, value, fieldName);
                         break;
                 }
 
@@ -590,7 +590,7 @@ public final class FlatObjectFieldMapper extends ParametrizedFieldMapper {
         return concat;
     }
 
-    private void ParseValueAddFields(ParseContext context, String value, String fieldName) throws IOException {
+    private void parseValueAddFields(ParseContext context, String value, String fieldName) throws IOException {
         if (value == null || value.length() > ignoreAbove) {
             return;
         }

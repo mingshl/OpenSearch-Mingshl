@@ -43,12 +43,24 @@ teardown:
       indices.refresh:
         index: test
 
+  # There is exactly a single searchable document in the index.
+  - do:
+      search:
+        body: {
+          query: {
+            match_all: {}
+          }
+        }
+
+  - length:   { hits.hits: 1  }
+
+  # Let's search within flat-object field.
   - do:
       search:
         body: {
           _source: true,
           query: {
-            match: { catalog: "Lucene in Action"}
+            match: { catalog._value: "Lucene in Action"}
           }
         }
 

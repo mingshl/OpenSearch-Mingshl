@@ -7,7 +7,9 @@ setup:
         index: test
         body:
           mappings:
-            dynamic: strict
+            # dynamic: strict
+            # Comment out ^^ strict dynamic as there shouldn't be created any dynamic fields.
+            # We verify this later in this test.
             properties:
               ISBN13:
                 type : "keyword"
@@ -42,6 +44,19 @@ teardown:
   - do:
       indices.refresh:
         index: test
+
+  # Verify that mapping under the catalog field did not expand.
+  - do:
+      indices.get_mapping:
+        index: test
+
+  - is_true: test.mappings
+  - match: { test.mappings.properties.ISBN13.type:  keyword     }
+  - match: { test.mappings.properties.catalog.type: flat-object }
+  # Verify that there are no dynamic fields created.
+  # https://github.com/opensearch-project/OpenSearch/tree/main/rest-api-spec/src/main/resources/rest-api-spec/test#length
+  - length: { test.mappings.properties: 2 }
+  - length: { test.mappings.properties.catalog: 1 }
 
   # There is exactly a single searchable document in the index.
   - do:

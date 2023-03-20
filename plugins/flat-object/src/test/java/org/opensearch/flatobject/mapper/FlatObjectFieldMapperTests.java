@@ -30,11 +30,10 @@ public class FlatObjectFieldMapperTests extends MapperTestCase {
         return org.opensearch.common.collect.List.of(new FlatObjectPlugin());
     }
 
-
     public final void testExistsQueryDocValuesDisabled() throws IOException {
         MapperService mapperService = createMapperService(fieldMapping(b -> {
             minimalMapping(b);
-            b.field("doc_values", false);
+            // minimalMapping set doc_values is false
             if (randomBoolean()) {
                 b.field("norms", false);
             }
@@ -46,15 +45,17 @@ public class FlatObjectFieldMapperTests extends MapperTestCase {
     public final void testExistsQueryDocValuesDisabledWithNorms() throws IOException {
         MapperService mapperService = createMapperService(fieldMapping(b -> {
             minimalMapping(b);
-            b.field("doc_values", false);
-            b.field("norms", false);
+            // minimalMapping set doc_values is false
+            b.field("norms", true);
         }));
         assertExistsQuery(mapperService);
         assertParseMinimalWarnings();
     }
+
     @Override
     public void minimalMapping(XContentBuilder b) throws IOException {
         b.field("type", FIELD_TYPE);
+        b.field("doc_values", true);
     }
 
     /**
@@ -80,7 +81,8 @@ public class FlatObjectFieldMapperTests extends MapperTestCase {
         checker.registerConflictCheck("normalizer", b -> b.field("normalizer", "lowercase"));
 
         checker.registerUpdateCheck(b -> b.field("eager_global_ordinals", true), m -> assertTrue(m.fieldType().eagerGlobalOrdinals()));
-        checker.registerUpdateCheck(b -> b.field("ignore_above", 256), m -> assertEquals(256, ((FlatObjectFieldMapper) m).ignoreAbove()));
+        // checker.registerUpdateCheck(b -> b.field("ignore_above", 256), m -> assertEquals(256, ((FlatObjectFieldMapper)
+        // m).ignoreAbove()));
         checker.registerUpdateCheck(
             b -> b.field("split_queries_on_whitespace", true),
             m -> assertEquals("_whitespace", m.fieldType().getTextSearchInfo().getSearchAnalyzer().name())

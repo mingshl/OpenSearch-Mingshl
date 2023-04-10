@@ -1,0 +1,83 @@
+# Simple smoke test: flat-object field mapping type can be sent to cluster and simple document can be indexed.
+
+---
+setup:
+  - do:
+      indices.create:
+        index: test
+        body:
+          mappings:
+            # dynamic: strict
+            # Comment out ^^ strict dynamic as there shouldn't be created any dynamic fields.
+            # We verify this later in this test.
+            properties:
+              ISBN13:
+                type : "keyword"
+              catalog:
+                type : "flat-object"
+
+---
+teardown:
+  - do:
+      indices.delete:
+        index: test
+
+---
+"Flat object test":
+  - do:
+      index:
+        index: test
+        id:    1
+        body:  {
+          "ISBN13": "V9781933988177",
+          "catalog": {
+            "title": "Lucene in Action",
+            "author":
+            {
+              "surname": "McCandless",
+              "given": "Mike"
+            }
+          }
+        }
+
+  # Do index refresh
+  - do:
+      indices.refresh:
+        index: test
+
+  # Verify that mapping under the catalog field did not expand.
+  - do:
+      indices.get_mapping:
+        index: test
+
+  - is_true: test.mappings
+  - match: { test.mappings.properties.ISBN13.type:  keyword     }
+  - match: { test.mappings.properties.catalog.type: flat-object }
+  # Verify that there are no dynamic fields created.
+  # https://github.com/opensearch-project/OpenSearch/tree/main/rest-api-spec/src/main/resources/rest-api-spec/test#length
+  - length: { test.mappings.properties: 2 }
+  - length: { test.mappings.properties.catalog: 1 }
+
+  # There is exactly a single searchable document in the index.
+  - do:
+      search:
+        body: {
+          query: {
+            match_all: {}
+          }
+        }
+
+  - length:   { hits.hits: 1  }
+
+  # Let's search within flat-object field.
+  - do:
+      search:
+        body: {
+          _source: true,
+          query: {
+            match: { catalog._value: "Lucene in Action"}
+          }
+        }
+
+  - length:   { hits.hits: 1  }
+  - match: { hits.hits.0._source.catalog.title: "Lucene in Action" }

@@ -10,16 +10,17 @@ package org.opensearch.flatobject.mapper;
 
 import org.opensearch.common.xcontent.XContentBuilder;
 import org.opensearch.flatobject.FlatObjectPlugin;
-import org.opensearch.index.mapper.FieldMapperTestCase2;
+import org.opensearch.index.mapper.MapperService;
+import org.opensearch.index.mapper.MapperTestCase;
 import org.opensearch.plugins.Plugin;
 
 import java.io.IOException;
 import java.util.Collection;
 
-public class FlatObjectFieldMapperTests extends FieldMapperTestCase2<FlatObjectFieldMapper.Builder> {
+public class FlatObjectFieldMapperTests extends MapperTestCase {
     private static final String FIELD_TYPE = "flat-object";
 
-    @Override
+    // @Override
     public FlatObjectFieldMapper.Builder newBuilder() {
         return new FlatObjectFieldMapper.Builder("flat-object");
     }
@@ -29,9 +30,32 @@ public class FlatObjectFieldMapperTests extends FieldMapperTestCase2<FlatObjectF
         return org.opensearch.common.collect.List.of(new FlatObjectPlugin());
     }
 
+    public final void testExistsQueryDocValuesDisabled() throws IOException {
+        MapperService mapperService = createMapperService(fieldMapping(b -> {
+            minimalMapping(b);
+            // minimalMapping set doc_values is false
+            if (randomBoolean()) {
+                b.field("norms", false);
+            }
+        }));
+        assertExistsQuery(mapperService);
+        assertParseMinimalWarnings();
+    }
+
+    public final void testExistsQueryDocValuesDisabledWithNorms() throws IOException {
+        MapperService mapperService = createMapperService(fieldMapping(b -> {
+            minimalMapping(b);
+            // minimalMapping set doc_values is false
+            b.field("norms", true);
+        }));
+        assertExistsQuery(mapperService);
+        assertParseMinimalWarnings();
+    }
+
     @Override
     public void minimalMapping(XContentBuilder b) throws IOException {
         b.field("type", FIELD_TYPE);
+        b.field("doc_values", true);
     }
 
     /**
@@ -41,28 +65,52 @@ public class FlatObjectFieldMapperTests extends FieldMapperTestCase2<FlatObjectF
      */
     @Override
     protected void writeFieldValue(XContentBuilder builder) throws IOException {
-        builder.value("value");
+        builder.startObject();
+        builder.field("foo", "bar");
+        builder.endObject();
     }
 
     @Override
     protected void registerParameters(ParameterChecker checker) throws IOException {
-        // TODO
+        checker.registerConflictCheck("doc_values", b -> b.field("doc_values", false));
+        checker.registerConflictCheck("index", b -> b.field("index", false));
+        checker.registerConflictCheck("store", b -> b.field("store", true));
+        checker.registerConflictCheck("index_options", b -> b.field("index_options", "freqs"));
+        checker.registerConflictCheck("null_value", b -> b.field("null_value", "foo"));
+        checker.registerConflictCheck("similarity", b -> b.field("similarity", "boolean"));
+        checker.registerConflictCheck("normalizer", b -> b.field("normalizer", "lowercase"));
+
+        checker.registerUpdateCheck(b -> b.field("eager_global_ordinals", true), m -> assertTrue(m.fieldType().eagerGlobalOrdinals()));
+        // checker.registerUpdateCheck(b -> b.field("ignore_above", 256), m -> assertEquals(256, ((FlatObjectFieldMapper)
+        // m).ignoreAbove()));
+        checker.registerUpdateCheck(
+            b -> b.field("split_queries_on_whitespace", true),
+            m -> assertEquals("_whitespace", m.fieldType().getTextSearchInfo().getSearchAnalyzer().name())
+        );
+
+        // norms can be set from true to false, but not vice versa
+        checker.registerConflictCheck("norms", b -> b.field("norms", true));
+        checker.registerUpdateCheck(b -> {
+            b.field("type", "flat-object");
+            b.field("norms", true);
+        }, b -> {
+            b.field("type", "flat-object");
+            b.field("norms", false);
+        }, m -> assertFalse(m.fieldType().getTextSearchInfo().hasNorms()));
+
+        checker.registerUpdateCheck(b -> b.field("boost", 2.0), m -> assertEquals(m.fieldType().boost(), 2.0, 0));
     }
 
     @Override
-    public void testMergeConflicts() {
-        // TODO, Merge is not implemented for flat-object yet
+    public void testMinimalToMaximal() throws IOException {
+        // ToDO [299 OpenSearch-3.0.0-SNAPSHOT-unknown "Parameter [boost] on field [field] is deprecated and will be removed in 8.0"]
+
     }
 
     @Override
-    public void testMeta() {
-        // TODO, parse_values is not implemented for flat-object yet
-    }
+    public void testUpdates() throws IOException {
+        // Todo
 
-    @Override
-    public void testDeprecatedBoost() {
-        // TODO, [boost : 2.0] is not determined for flat-object yet,
-        // might need to overwrite this test
     }
 
 }

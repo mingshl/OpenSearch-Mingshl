@@ -23,6 +23,8 @@ buildCache {
 rootProject.name = "OpenSearch"
 
 include 'doc-tools'
+//include ':dependencies:client:opensearch:opensearch-rest-high-level-client'
+
 includeBuild("doc-tools/missing-doclet")
 
 List projects = [
@@ -36,6 +38,7 @@ List projects = [
   'client:test',
   'client:client-benchmark-noop-api-plugin',
   'client:benchmark',
+  'client:opensearch:opensearch-rest-high-level-client',
   'benchmarks',
   'distribution:archives:integ-test-zip',
   'distribution:archives:windows-zip',

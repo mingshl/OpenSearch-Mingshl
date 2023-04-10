@@ -9,7 +9,8 @@
  * GitHub history for details.
  */
 
-//apply plugin: 'opensearch.opensearchplugin'
+import org.opensearch.gradle.test.RestIntegTestTask
+
 apply plugin: 'opensearch.yaml-rest-test'
 apply plugin: 'opensearch.internal-cluster-test'
 
@@ -20,11 +21,49 @@ opensearchplugin {
   licenseFile rootProject.file('licenses/APACHE-LICENSE-2.0.txt')
   noticeFile rootProject.file('NOTICE.txt')
 }
-
-//test.enabled = false
-
 restResources {
   restApi {
-    includeCore '_common', 'indices', 'index', 'search'
+    includeCore '_common', 'indices', 'index', 'search','client:rest-high-level'
   }
+}
+
+task integTest(type: RestIntegTestTask) {
+  description = "Run tests against a cluster"
+  testClassesDirs = sourceSets.test.output.classesDirs
+  classpath = sourceSets.test.runtimeClasspath
+}
+tasks.named("check").configure { dependsOn(integTest) }
+
+integTest {
+  // The --debug-jvm command-line option makes the cluster debuggable; this makes the tests debuggable
+  if (System.getProperty("test.debug") != null) {
+    jvmArgs '-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005'
+  }
+}
+
+testClusters.integTest {
+  testDistribution = "INTEG_TEST"
+
+  // This installs our plugin into the testClusters
+  plugin(project.tasks.bundlePlugin.archiveFile)
+}
+
+dependencies {
+  api( project(":server")) {
+    // JMH ships with the conflicting version 4.6. This prevents us from using jopt-simple in benchmarks (which should be ok) but allows
+    // us to invoke the JMH uberjar as usual.
+    exclude group: 'net.sf.jopt-simple', module: 'jopt-simple'
+  }
+  api(project(":client:rest-high-level"))
+  api "org.openjdk.jmh:jmh-core:$versions.jmh"
+  implementation 'org.json:json:20210307'
+}
+
+  // Uncommend the following if you want to spin up testcluster with more than one node.
+  //testClusters.all {
+  //  numberOfNodes = 2
+  //}
+
+run {
+  useCluster testClusters.integTest
 }

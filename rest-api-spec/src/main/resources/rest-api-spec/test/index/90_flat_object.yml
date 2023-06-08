@@ -1,6 +1,6 @@
 ---
 # The initial test setup includes:
-# - Create flat_object mapping
+# - Create flat_object mapping for test index
 # - Index two example documents
 # - Refresh the index so it is ready for search tests
 setup:
@@ -63,6 +63,7 @@ setup:
           "required_matches": 1
         }
 
+
   # Do index refresh
   - do:
       indices.refresh:
@@ -123,6 +124,7 @@ teardown:
 
   - length:   { hits.hits: 1  }
   - match: { hits.hits.0._source.catalog.title: "Lucene in Action" }
+
 
   # Match Query without dot path.
   - do:
